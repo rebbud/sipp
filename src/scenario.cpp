@@ -1636,6 +1636,20 @@ void scenario::parseAction(CActions *actions)
 #else
                 ERROR("Scenario specifies a rtp_stream action, but this version of SIPp does not have RTP stream support");
 #endif
+            } else if ((cptr = xp_get_value("rtp_stream2"))) {
+#ifdef RTP_STREAM
+                hasMedia = 1;
+                if (strcmp(cptr, "pause") == 0) {
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_PAUSE);
+                } else if (strcmp(cptr, "resume") == 0) {
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_RESUME);
+                } else {
+                    tmpAction->setRTPStreamActInfo(cptr);
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_PLAY);
+                }
+#else
+                ERROR("Scenario specifies a rtp_stream2 action, but this version of SIPp does not have RTP stream support");
+#endif
             } else {
                 ERROR("illegal <exec> in the scenario\n");
             }

@@ -612,10 +612,17 @@ static void pollset_process(int wait)
             char msg[SIPP_MAX_MSG_SIZE];
             struct sockaddr_storage src;
             ssize_t len;
+           // Debug purpose only
+            socklen_t src_len = sizeof(src);
+           char hoststr[80];
+           char portstr[6];
 
             len = read_message(sock, msg, sizeof(msg), &src);
             if (len > 0) {
                 process_message(sock, msg, len, &src);
+           // Debug purpose only
+               int rc = getnameinfo((struct sockaddr *)&src, src_len, hoststr, sizeof(hoststr), portstr, sizeof(portstr), NI_NUMERICHOST | NI_NUMERICSERV);
+               if (rc == 0) LOG_MSG("AQUI == New message from %s %s\n", hoststr, portstr);
             } else {
                 assert(0);
             }

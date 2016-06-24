@@ -381,7 +381,9 @@ extern unsigned long rtp2_bytes_pcap              _DEFVAL(0);
 #ifdef RTP_STREAM
 extern volatile unsigned long rtpstream_numthreads _DEFVAL(0);
 extern volatile unsigned long rtpstream_bytes_in  _DEFVAL(0);
+extern volatile unsigned long rtpstream_bytes_in2  _DEFVAL(0);
 extern volatile unsigned long rtpstream_bytes_out _DEFVAL(0);
+extern volatile unsigned long rtpstream_bytes_out2 _DEFVAL(0);
 extern volatile unsigned long rtpstream_pckts     _DEFVAL(0);
 #endif
 

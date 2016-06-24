@@ -194,7 +194,8 @@ int send_packets (play_args_t * play_args)
         ERROR("Can't bind media raw socket");
         return ret;
     }
-
+// AQUI (no llega aqui)
+WARNING(":: send_packets (play_args_t * play_args)");
 #ifndef MSG_DONTWAIT
     fd_flags = fcntl(sock, F_GETFL , NULL);
     fd_flags |= O_NONBLOCK;

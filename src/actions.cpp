@@ -155,6 +155,7 @@ void CAction::afficheInfo()
 #ifdef RTP_STREAM
   } else if (M_action == E_AT_RTP_STREAM_PLAY) {
       printf("Type[%d] - rtp_stream playfile file %s loop=%d payload %d bytes per packet=%d ms per packet=%d ticks per packet=%d", M_action,M_rtpstream_actinfo.filename,M_rtpstream_actinfo.loop_count,M_rtpstream_actinfo.payload_type,M_rtpstream_actinfo.bytes_per_packet,M_rtpstream_actinfo.ms_per_packet,M_rtpstream_actinfo.ticks_per_packet);
+      WARNING("Type[%d] - rtp_stream playfile file %s loop=%d payload %d bytes per packet=%d ms per packet=%d ticks per packet=%d", M_action,M_rtpstream_actinfo.filename,M_rtpstream_actinfo.loop_count,M_rtpstream_actinfo.payload_type,M_rtpstream_actinfo.bytes_per_packet,M_rtpstream_actinfo.ms_per_packet,M_rtpstream_actinfo.ticks_per_packet);
   } else if (M_action == E_AT_RTP_STREAM_PAUSE) {
       printf("Type[%d] - rtp_stream pause", M_action);
   } else if (M_action == E_AT_RTP_STREAM_RESUME) {
@@ -492,12 +493,23 @@ void CAction::setRTPStreamActInfo(const char* P_value)
 {
   char *ParamString;
   char *NextComma;
+  std::string strFromChar;
 
   if (strlen(P_value)>=sizeof (M_rtpstream_actinfo.filename)) {
     ERROR("Filename %s is too long, maximum supported length %zu\n", P_value,
           sizeof(M_rtpstream_actinfo.filename) - 1);
   }
-  strcpy (M_rtpstream_actinfo.filename,P_value);
+
+  strFromChar.append(P_value);
+  std::string::size_type pos = strFromChar.find(';');
+  if (pos != std::string::npos) {
+       strcpy (M_rtpstream_actinfo.filename,strFromChar.substr(0, pos).c_str());
+  } else {
+         strcpy (M_rtpstream_actinfo.filename,strFromChar.c_str());
+  }
+
+  strcpy (M_rtpstream_actinfo.filename2, strFromChar.substr(strFromChar.find(";") + 1).c_str());
+
   ParamString= strchr(M_rtpstream_actinfo.filename,',');
   NextComma= NULL;
 
@@ -547,9 +559,15 @@ void CAction::setRTPStreamActInfo(const char* P_value)
              break;
   }
 
+  LOG_MSG("AQUI: File1: '%s; File2='%s'\n",M_rtpstream_actinfo.filename, M_rtpstream_actinfo.filename2);
+
   if (rtpstream_cache_file(M_rtpstream_actinfo.filename)<0) {
     ERROR("Cannot read/cache rtpstream file %s\n",M_rtpstream_actinfo.filename);
   }
+  if (rtpstream_cache_file(M_rtpstream_actinfo.filename2)<0) {
+    ERROR("Cannot read/cache rtpstream file %s\n",M_rtpstream_actinfo.filename2);
+  }
+
 }
 
 void CAction::setRTPStreamActInfo (rtpstream_actinfo_t *P_value)

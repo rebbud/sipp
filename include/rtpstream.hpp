@@ -28,12 +28,14 @@ struct rtpstream_callinfo_t
 {
   taskentry_t  *taskinfo;
   int          audioport;
+  int          audioport2;
   int          videoport;
 };
 
 struct rtpstream_actinfo_t
 {
  char   filename[RTPSTREAM_MAX_FILENAMELEN];
+ char   filename2[RTPSTREAM_MAX_FILENAMELEN];
  int    loop_count;
  int    bytes_per_packet;
  int    ms_per_packet;
@@ -48,7 +50,7 @@ void rtpstream_shutdown (void);
 int rtpstream_get_audioport (rtpstream_callinfo_t *callinfo);
 int rtpstream_get_videoport (rtpstream_callinfo_t *callinfo);
 void rtpstream_set_remote (rtpstream_callinfo_t *callinfo, int ip_ver, char *ip_addr,
-                           int audio_port, int video_port);
+                           int audio_port,int audio_port2, int video_port);
 
 int rtpstream_cache_file (char *filename);
 void rtpstream_play (rtpstream_callinfo_t *callinfo, rtpstream_actinfo_t *actioninfo);
