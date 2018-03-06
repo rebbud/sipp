@@ -71,8 +71,10 @@ struct taskentry_t
   /* rtp stream information */
   unsigned long long   last_timestamp;
   unsigned short       seq;
+  unsigned short       seq2;
   char                 payload_type;
   unsigned int         ssrc_id;
+  unsigned int         ssrc_id2;
 
   /* current playback information */
   int                  loop_count;
@@ -167,6 +169,12 @@ static void rtpstream_free_taskinfo(taskentry_t* taskinfo)
     if (taskinfo->audio_rtcp_socket!=-1) {
       close (taskinfo->audio_rtcp_socket);
     }
+    if (taskinfo->audio_rtp_socket2!=-1) {
+      close (taskinfo->audio_rtp_socket2);
+    }
+    if (taskinfo->audio_rtcp_socket2!=-1) {
+      close (taskinfo->audio_rtcp_socket2);
+    }
     if (taskinfo->video_rtp_socket!=-1) {
       close (taskinfo->video_rtp_socket);
     }
@@ -226,13 +234,13 @@ static void rtpstream_process_task_flags(taskentry_t* taskinfo)
 
 // ========================================================================================================
       if (taskinfo->audio_rtp_socket != -1) {
-            socklen_t src_len = sizeof(taskinfo->remote_audio_rtp_addr);
-                temp = getnameinfo((struct sockaddr *)&taskinfo->remote_audio_rtp_addr, src_len, hoststr, sizeof(hoststr), portstr, sizeof(portstr), NI_NUMERICHOST | NI_NUMERICSERV);
-                if (temp == 0) LOG_MSG("AQUI: rtpstream_process_task_flags() ..  Conecting to %s %s\n", hoststr, portstr);
+        socklen_t src_len = sizeof(taskinfo->remote_audio_rtp_addr);
+        temp = getnameinfo((struct sockaddr *)&taskinfo->remote_audio_rtp_addr, src_len, hoststr, sizeof(hoststr), portstr, sizeof(portstr), NI_NUMERICHOST | NI_NUMERICSERV);
+        if (temp == 0) LOG_MSG("AQUI: rtpstream_process_task_flags() ..  Conecting to %s %s\n", hoststr, portstr);
 
         rc = connect(taskinfo->audio_rtp_socket, (struct sockaddr *)&taskinfo->remote_audio_rtp_addr, remote_addr_len);
         if (rc < 0) {
-       WARNING("error, I couldn't connect to %s %s", hoststr, portstr);
+          WARNING("error, I couldn't connect to %s %s", hoststr, portstr);
           debugprint("closing audio rtp socket %d due to error %d in rtpstream_process_task_flags taskinfo=%p\n",
                      taskinfo->audio_rtp_socket, errno, taskinfo);
           close(taskinfo->audio_rtp_socket);
@@ -243,17 +251,17 @@ static void rtpstream_process_task_flags(taskentry_t* taskinfo)
       }
 // ========================================================================================================
       if (taskinfo->audio_rtp_socket2 != -1) {
-            socklen_t src_len = sizeof(taskinfo->remote_audio_rtp_addr2);
-            temp = getnameinfo((struct sockaddr *)&taskinfo->remote_audio_rtp_addr2, src_len, hoststr, sizeof(hoststr), portstr, sizeof(portstr), NI_NUMERICHOST | NI_NUMERICSERV);
-            if (temp == 0) LOG_MSG("AQUI: rtpstream_process_task_flags() ..  Conecting2 to %s %s\n", hoststr, portstr);
+        socklen_t src_len = sizeof(taskinfo->remote_audio_rtp_addr2);
+        temp = getnameinfo((struct sockaddr *)&taskinfo->remote_audio_rtp_addr2, src_len, hoststr, sizeof(hoststr), portstr, sizeof(portstr), NI_NUMERICHOST | NI_NUMERICSERV);
+        if (temp == 0) LOG_MSG("AQUI: rtpstream_process_task_flags() ..  Conecting2 to %s %s\n", hoststr, portstr);
 
         rc = connect(taskinfo->audio_rtp_socket2, (struct sockaddr *)&taskinfo->remote_audio_rtp_addr2, remote_addr_len);
         if (rc < 0) {
-        WARNING("error, I couldn't connect to %s %s", hoststr, portstr);
+          WARNING("error, I couldn't connect to %s %s", hoststr, portstr);
           debugprint("closing audio rtp socket %d due to error %d in rtpstream_process_task_flags taskinfo=%p\n",
-                     taskinfo->audio_rtp_socket, errno, taskinfo);
-          close(taskinfo->audio_rtp_socket);
-          taskinfo->audio_rtp_socket = -1;
+                     taskinfo->audio_rtp_socket2, errno, taskinfo);
+          close(taskinfo->audio_rtp_socket2);
+          taskinfo->audio_rtp_socket2 = -1;
         }
        else
 	  LOG_MSG("AQUI: 2nd: rc=%d.taskinfo->audio_rtp_socket2=%d, I'm connected to,  %s %s\n",rc, taskinfo->audio_rtp_socket2, hoststr, portstr);
@@ -313,6 +321,7 @@ static void rtpstream_process_task_flags(taskentry_t* taskinfo)
     taskinfo->last_timestamp= getmilliseconds()*taskinfo->timeticks_per_ms;
     taskinfo->flags&= ~TI_PLAYFILE;
   }
+  LOG_MSG("CAQ -- END rtpstream_process_task_flags, %d\n", (int)sizeof(taskinfo->flags)); 
 }
 
 /**** todo - check code ****/
@@ -389,6 +398,7 @@ static unsigned long rtpstream_playrtptask(taskentry_t *taskinfo, unsigned long 
             if (taskinfo->flags & (TI_NULL_AUDIOIP|TI_PAUSERTP)) {
                 /* when paused, set timestamp so stream appears to be up to date */
                 taskinfo->last_timestamp = target_timestamp;
+                //LOG_MSG("CAQ -- set to paused\n");
             }
             if (taskinfo->last_timestamp < target_timestamp) {
                 /* need to send rtp payload - build rtp packet header... */
@@ -471,9 +481,9 @@ static unsigned long rtpstream_playrtptask(taskentry_t *taskinfo, unsigned long 
 //            if (taskinfo->last_timestamp < target_timestamp) {
                 /* need to send rtp payload - build rtp packet header... */
                 udp2.hdr.flags = htons(0x8000 | taskinfo->payload_type);
-                udp2.hdr.seq = htons(taskinfo->seq);
+                udp2.hdr.seq = htons(taskinfo->seq2);
                 udp2.hdr.timestamp = htonl((uint32_t)(taskinfo->last_timestamp & 0xFFFFFFFF));
-                udp2.hdr.ssrc_id = htonl(taskinfo->ssrc_id);
+                udp2.hdr.ssrc_id = htonl(taskinfo->ssrc_id2);
                 /* add payload data to the packet - handle buffer wraparound */
                 if (taskinfo->file_bytes_left2 >= taskinfo->bytes_per_packet) {
                     /* no need for fancy acrobatics */
@@ -504,7 +514,7 @@ static unsigned long rtpstream_playrtptask(taskentry_t *taskinfo, unsigned long 
                     rtpstream_bytes_out2 += taskinfo->bytes_per_packet + sizeof(rtp_header_t);
                     rtpstream_pckts++;
                     /* advance playback pointer to next packet */
-//                    taskinfo->seq++;
+                    taskinfo->seq2++;
                     /* must change if timer ticks per packet can be fractional */
 //                    taskinfo->last_timestamp += taskinfo->timeticks_per_packet;
                     taskinfo->file_bytes_left2 -= taskinfo->bytes_per_packet;
@@ -776,6 +786,7 @@ int rtpstream_new_call (rtpstream_callinfo_t *callinfo)
   taskinfo->video_rtcp_socket= -1;
   /* rtp stream members */
   taskinfo->ssrc_id= global_ssrc_id++;
+  taskinfo->ssrc_id2= global_ssrc_id++;
   /* pthread mutexes */
   pthread_mutex_init(&(callinfo->taskinfo->mutex),NULL);
 

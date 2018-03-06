@@ -3992,8 +3992,10 @@ WARNING("=== Create a thread to send RTP or UDPTL packets: pthread_attr_init(&at
 
 #ifdef RTP_STREAM
     } else if (currentAction->getActionType() == CAction::E_AT_RTP_STREAM_PAUSE) {
+      LOG_MSG("CAQ --- Before rtpstream_pause()\n");
       rtpstream_pause (&rtpstream_callinfo);
     } else if (currentAction->getActionType() == CAction::E_AT_RTP_STREAM_RESUME) {
+      LOG_MSG("CAQ --- Before rtpstream_resume()\n");
       rtpstream_resume (&rtpstream_callinfo);
     } else if (currentAction->getActionType() == CAction::E_AT_RTP_STREAM_PLAY) {
      LOG_MSG("AQUI --- Before rtpstream_play()\n");
