@@ -17,6 +17,7 @@
  */
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -70,6 +71,8 @@ struct taskentry_t
 
   /* rtp stream information */
   unsigned long long   last_timestamp;
+  unsigned long long   ts;
+  unsigned long long   ts2;
   unsigned short       seq;
   unsigned short       seq2;
   char                 payload_type;
@@ -246,8 +249,14 @@ static void rtpstream_process_task_flags(taskentry_t* taskinfo)
           close(taskinfo->audio_rtp_socket);
           taskinfo->audio_rtp_socket = -1;
         }
-       else
+        else {
           LOG_MSG("AQUI: 1st: rc=%d. taskinfo->audio_rtp_socket2=%d, I'm connected to,  %s %s\n",rc, taskinfo->audio_rtp_socket,hoststr, portstr);
+          srand(time(NULL));
+          taskinfo->seq = (unsigned short)rand();
+          global_ssrc_id = rand();
+          taskinfo->ssrc_id = (unsigned int)global_ssrc_id; 
+          taskinfo->ts = (unsigned long long)rand();
+        }
       }
 // ========================================================================================================
       if (taskinfo->audio_rtp_socket2 != -1) {
@@ -263,8 +272,13 @@ static void rtpstream_process_task_flags(taskentry_t* taskinfo)
           close(taskinfo->audio_rtp_socket2);
           taskinfo->audio_rtp_socket2 = -1;
         }
-       else
+        else {
 	  LOG_MSG("AQUI: 2nd: rc=%d.taskinfo->audio_rtp_socket2=%d, I'm connected to,  %s %s\n",rc, taskinfo->audio_rtp_socket2, hoststr, portstr);
+          srand(rand());
+          taskinfo->seq2 = (unsigned short)rand();
+          taskinfo->ssrc_id2 = (unsigned int)rand();
+          taskinfo->ts2 = (unsigned long long)rand();
+        }
       }
 
 
@@ -397,6 +411,7 @@ static unsigned long rtpstream_playrtptask(taskentry_t *taskinfo, unsigned long 
             next_wake = timenow_ms + taskinfo->ms_per_packet - timenow_ms % taskinfo->ms_per_packet;
             if (taskinfo->flags & (TI_NULL_AUDIOIP|TI_PAUSERTP)) {
                 /* when paused, set timestamp so stream appears to be up to date */
+                taskinfo->ts = taskinfo->ts + target_timestamp - taskinfo->last_timestamp;
                 taskinfo->last_timestamp = target_timestamp;
                 //LOG_MSG("CAQ -- set to paused\n");
             }
@@ -404,7 +419,8 @@ static unsigned long rtpstream_playrtptask(taskentry_t *taskinfo, unsigned long 
                 /* need to send rtp payload - build rtp packet header... */
                 udp.hdr.flags = htons(0x8000 | taskinfo->payload_type);
                 udp.hdr.seq = htons(taskinfo->seq);
-                udp.hdr.timestamp = htonl((uint32_t)(taskinfo->last_timestamp & 0xFFFFFFFF));
+                //udp.hdr.timestamp = htonl((uint32_t)(taskinfo->last_timestamp & 0xFFFFFFFF));
+                udp.hdr.timestamp = htonl((uint32_t)(taskinfo->ts & 0xFFFFFFFF));
                 udp.hdr.ssrc_id = htonl(taskinfo->ssrc_id);
                 /* add payload data to the packet - handle buffer wraparound */
                 if (taskinfo->file_bytes_left >= taskinfo->bytes_per_packet) {
@@ -439,6 +455,7 @@ static unsigned long rtpstream_playrtptask(taskentry_t *taskinfo, unsigned long 
                     taskinfo->seq++;
                     /* must change if timer ticks per packet can be fractional */
                     taskinfo->last_timestamp += taskinfo->timeticks_per_packet;
+                    taskinfo->ts += taskinfo->timeticks_per_packet;
                     taskinfo->file_bytes_left -= taskinfo->bytes_per_packet;
                     if (taskinfo->file_bytes_left > 0) {
                         taskinfo->current_file_bytes += taskinfo->bytes_per_packet;
@@ -482,7 +499,8 @@ static unsigned long rtpstream_playrtptask(taskentry_t *taskinfo, unsigned long 
                 /* need to send rtp payload - build rtp packet header... */
                 udp2.hdr.flags = htons(0x8000 | taskinfo->payload_type);
                 udp2.hdr.seq = htons(taskinfo->seq2);
-                udp2.hdr.timestamp = htonl((uint32_t)(taskinfo->last_timestamp & 0xFFFFFFFF));
+                // udp2.hdr.timestamp = htonl((uint32_t)(taskinfo->last_timestamp & 0xFFFFFFFF));
+                udp2.hdr.timestamp = htonl((uint32_t)(taskinfo->ts2 & 0xFFFFFFFF));
                 udp2.hdr.ssrc_id = htonl(taskinfo->ssrc_id2);
                 /* add payload data to the packet - handle buffer wraparound */
                 if (taskinfo->file_bytes_left2 >= taskinfo->bytes_per_packet) {
@@ -516,7 +534,7 @@ static unsigned long rtpstream_playrtptask(taskentry_t *taskinfo, unsigned long 
                     /* advance playback pointer to next packet */
                     taskinfo->seq2++;
                     /* must change if timer ticks per packet can be fractional */
-//                    taskinfo->last_timestamp += taskinfo->timeticks_per_packet;
+                    taskinfo->ts2 += taskinfo->timeticks_per_packet;
                     taskinfo->file_bytes_left2 -= taskinfo->bytes_per_packet;
                     if (taskinfo->file_bytes_left2 > 0) {
                         taskinfo->current_file_bytes2 += taskinfo->bytes_per_packet;
@@ -785,8 +803,12 @@ int rtpstream_new_call (rtpstream_callinfo_t *callinfo)
   taskinfo->video_rtp_socket= -1;
   taskinfo->video_rtcp_socket= -1;
   /* rtp stream members */
-  taskinfo->ssrc_id= global_ssrc_id++;
-  taskinfo->ssrc_id2= global_ssrc_id++;
+  /* DBR: random ssrc */
+  srand(rand()); 
+  global_ssrc_id = rand();
+  /* taskinfo->ssrc_id= global_ssrc_id; */
+  taskinfo->ssrc_id= global_ssrc_id; 
+  taskinfo->ssrc_id2= rand();
   /* pthread mutexes */
   pthread_mutex_init(&(callinfo->taskinfo->mutex),NULL);
 
