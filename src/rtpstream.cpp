@@ -263,8 +263,18 @@ static void rtpstream_process_task_flags(taskentry_t* taskinfo)
           close(taskinfo->audio_rtp_socket2);
           taskinfo->audio_rtp_socket2 = -1;
         }
+<<<<<<< Updated upstream
        else
 	  LOG_MSG("AQUI: 2nd: rc=%d.taskinfo->audio_rtp_socket2=%d, I'm connected to,  %s %s\n",rc, taskinfo->audio_rtp_socket2, hoststr, portstr);
+=======
+        else {
+	      LOG_MSG("AQUI: 2nd: rc=%d.taskinfo->audio_rtp_socket2=%d, I'm connected to,  %s %s\n",rc, taskinfo->audio_rtp_socket2, hoststr, portstr);
+          srand(rand());
+          taskinfo->seq2 = 1;
+          taskinfo->ssrc_id2 = (unsigned int)rand();
+          taskinfo->ts2 = (unsigned long long)rand();
+        }
+>>>>>>> Stashed changes
       }
 
 
@@ -482,7 +492,18 @@ static unsigned long rtpstream_playrtptask(taskentry_t *taskinfo, unsigned long 
                 /* need to send rtp payload - build rtp packet header... */
                 udp2.hdr.flags = htons(0x8000 | taskinfo->payload_type);
                 udp2.hdr.seq = htons(taskinfo->seq2);
+<<<<<<< Updated upstream
                 udp2.hdr.timestamp = htonl((uint32_t)(taskinfo->last_timestamp & 0xFFFFFFFF));
+=======
+                if (taskinfo->seq2 == 200) {
+                    // DBR - 2circles - change both SSRC_ID and Timestamp after 200 packets
+                    // DBR - CDK - change only Timestamp after 200 packets
+                    taskinfo->ts2 = taskinfo->ts2 << 1; 
+                    taskinfo->ssrc_id2 = (unsigned int)(global_ssrc_id+2); 
+                    udp2.hdr.ssrc_id = htonl(taskinfo->ssrc_id2);
+                }
+                udp2.hdr.timestamp = htonl((uint32_t)(taskinfo->ts2 & 0xFFFFFFFF));
+>>>>>>> Stashed changes
                 udp2.hdr.ssrc_id = htonl(taskinfo->ssrc_id2);
                 /* add payload data to the packet - handle buffer wraparound */
                 if (taskinfo->file_bytes_left2 >= taskinfo->bytes_per_packet) {
