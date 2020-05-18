@@ -144,7 +144,8 @@
 #define MAX_PEER_SIZE              4096  /* 3pcc extended mode: max size of peer names */
 #define MAX_LOCAL_TWIN_SOCKETS     10    /*3pcc extended mode:max number of peers from which
 cmd messages are received */
-
+#define DEFAULT_PREFERRED_AUDIO_CRYPTOSUITE ((char*)"AES_CM_128_HMAC_SHA1_80")
+#define DEFAULT_PREFERRED_VIDEO_CRYPTOSUITE ((char*)"AES_CM_128_HMAC_SHA1_80")
 /******************** Default parameters ***********************/
 
 #define DEFAULT_RATE                 10.0
@@ -170,7 +171,8 @@ cmd messages are received */
 #define DEFAULT_BEHAVIOR_ABORTUNEXP  2
 #define DEFAULT_BEHAVIOR_PINGREPLY   4
 
-#define DEFAULT_BEHAVIOR_ALL         (DEFAULT_BEHAVIOR_BYE | DEFAULT_BEHAVIOR_ABORTUNEXP | DEFAULT_BEHAVIOR_PINGREPLY)
+#define DEFAULT_BEHAVIOR_BADCSEQ     8
+#define DEFAULT_BEHAVIOR_ALL         (DEFAULT_BEHAVIOR_BYE | DEFAULT_BEHAVIOR_ABORTUNEXP | DEFAULT_BEHAVIOR_PINGREPLY | DEFAULT_BEHAVIOR_BADCSEQ)
 
 #ifdef RTP_STREAM
 #define DEFAULT_MIN_RTP_PORT         8192
@@ -258,6 +260,12 @@ extern int                hasMedia                _DEFVAL(0);
 extern int                rtp_default_payload     _DEFVAL(DEFAULT_RTP_PAYLOAD);
 extern int                rtp_tasks_per_thread    _DEFVAL(DEFAULT_RTP_THREADTASKS);
 extern int                rtp_buffsize            _DEFVAL(65535);
+extern int                min_rtp_port            _DEFVAL(DEFAULT_MIN_RTP_PORT);
+extern int                max_rtp_port            _DEFVAL(DEFAULT_MAX_RTP_PORT);
+extern bool               rtpcheck_debug          _DEFVAL(0);
+extern bool               srtpcheck_debug         _DEFVAL(0);
+extern double             audiotolerance          _DEFVAL(1.0);
+extern double             videotolerance          _DEFVAL(1.0);
 #endif
 
 extern bool               rtp_echo_enabled        _DEFVAL(0);
@@ -374,7 +382,13 @@ extern unsigned long rtp2_bytes_pcap              _DEFVAL(0);
 extern volatile unsigned long rtpstream_numthreads _DEFVAL(0);
 extern volatile unsigned long rtpstream_bytes_in  _DEFVAL(0);
 extern volatile unsigned long rtpstream_bytes_out _DEFVAL(0);
-extern volatile unsigned long rtpstream_pckts     _DEFVAL(0);
+extern volatile unsigned long rtpstream_abytes_in  _DEFVAL(0);
+extern volatile unsigned long rtpstream_vbytes_in  _DEFVAL(0);
+extern volatile unsigned long rtpstream_pckts     _DEFVAL(0);	
+extern volatile unsigned long rtpstream_abytes_out _DEFVAL(0);
+extern volatile unsigned long rtpstream_vbytes_out _DEFVAL(0);
+extern volatile unsigned long rtpstream_apckts    _DEFVAL(0);
+extern volatile unsigned long rtpstream_vpckts    _DEFVAL(0);
 #endif
 
 
