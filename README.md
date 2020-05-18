@@ -37,6 +37,7 @@ script: `build.sh`. This:
 * builds and runs the test suite
 * builds SIPp
 
+* please install sudo apt-get install libstdc++6 gcc-8 g++-8 gcc-7 g++-7 
 `build.sh` passes its arguments through to the configure script, so you
 can enable SSL, PCAP and SCTP support by calling `./build.sh
 --with-pcap --with-sctp --with-openssl` or `./build.sh --full` to enable

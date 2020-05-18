@@ -1,3 +1,9 @@
+Changes in 3.6.1
+================
+* Changes added to implement SRTP for sendonly audio calls
+
+
+
 Changes in 3.6.0
 ================
 
