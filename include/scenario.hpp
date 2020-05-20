@@ -25,6 +25,8 @@
 #define __SCENARIO__
 
 #include <map>
+#include <unordered_map>
+#include <tr1/unordered_map>
 #include <sys/socket.h>
 #include "actions.hpp"
 #include "variables.hpp"
@@ -188,7 +190,11 @@ public:
     int get_counter(const char *varName, const char *what);
     int get_rtd(const char *ptr, bool start);
     int find_var(const char *varName);
-
+    #ifdef RTP_STREAM
+    void addRtpTaskThreadID(pthread_t id);
+    void removeRtpTaskThreadID(pthread_t id);
+    std::tr1::unordered_map<pthread_t, std::string>& fetchRtpTaskThreadIDs();
+    #endif // RTP_STREAM
     CStat *stats;
     AllocVariableTable *allocVars;
 
@@ -220,6 +226,9 @@ private:
 
     bool hidedefault;
     bool last_recv_optional;
+    #ifdef RTP_STREAM
+    std::tr1::unordered_map<pthread_t, std::string> threadIDs;
+    #endif // RTP_STREAM
 };
 
 /* There are external variable containing the current scenario */

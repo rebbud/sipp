@@ -947,7 +947,7 @@ void SIPpSocket::invalidate()
 #endif
 
     /* In some error conditions, the socket FD has already been closed - if it hasn't, do so now. */
-    if (ss_fd != -1) {
+    if (ss_fd > 0) {
 #ifdef HAVE_EPOLL
         int rc = epoll_ctl(epollfd, EPOLL_CTL_DEL, ss_fd, NULL);
         if (rc == -1) {

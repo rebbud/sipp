@@ -21,7 +21,7 @@
 #define __SIPP__
 
 /* Std C includes */
-
+#include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,7 +36,7 @@
 #endif
 #endif
 #include <sys/time.h>
-#include <sys/poll.h>
+#include <poll.h>
 #ifdef HAVE_EPOLL
 #include <sys/epoll.h>
 #endif
@@ -118,7 +118,10 @@
 #define TRANSPORT_TO_STRING(p)     ((p==T_TCP) ? "TCP" : ((p==T_TLS)? "TLS" : ((p==T_UDP)? "UDP" : "SCTP")))
 
 #define SIPP_MAXFDS                65536
-#define SIPP_MAX_MSG_SIZE          65536
+
+#ifndef SIPP_MAX_MSG_SIZE
+#define SIPP_MAX_MSG_SIZE 65536
+#endif
 
 #define MSG_RETRANS_FIRST          0
 #define MSG_RETRANS_RETRANSMISSION 1
@@ -138,6 +141,8 @@
 #define MAX_PEER_SIZE              4096  /* 3pcc extended mode: max size of peer names */
 #define MAX_LOCAL_TWIN_SOCKETS     10    /*3pcc extended mode:max number of peers from which
 cmd messages are received */
+#define DEFAULT_PREFERRED_AUDIO_CRYPTOSUITE ((char*)"AES_CM_128_HMAC_SHA1_80")
+#define DEFAULT_PREFERRED_VIDEO_CRYPTOSUITE ((char*)"AES_CM_128_HMAC_SHA1_80")
 
 /******************** Default parameters ***********************/
 
@@ -252,6 +257,8 @@ MAYBE_EXTERN int                hasMedia                DEFVAL(0);
 MAYBE_EXTERN int                rtp_default_payload     DEFVAL(DEFAULT_RTP_PAYLOAD);
 MAYBE_EXTERN int                rtp_tasks_per_thread    DEFVAL(DEFAULT_RTP_THREADTASKS);
 MAYBE_EXTERN int                rtp_buffsize            DEFVAL(65535);
+MAYBE_EXTERN double             audiotolerance          DEFVAL(1.0);
+MAYBE_EXTERN double             videotolerance          DEFVAL(1.0);
 #endif
 
 MAYBE_EXTERN bool               rtp_echo_enabled        DEFVAL(0);
@@ -370,6 +377,7 @@ MAYBE_EXTERN volatile unsigned long rtpstream_numthreads DEFVAL(0);
 MAYBE_EXTERN volatile unsigned long rtpstream_bytes_in  DEFVAL(0);
 MAYBE_EXTERN volatile unsigned long rtpstream_bytes_out DEFVAL(0);
 MAYBE_EXTERN volatile unsigned long rtpstream_pckts     DEFVAL(0);
+
 #endif
 
 
