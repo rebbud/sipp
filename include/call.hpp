@@ -34,8 +34,10 @@
 #endif
 #ifdef RTP_STREAM
 #include "rtpstream.hpp"
+#include "jlsrtp.hpp"
 #endif
 
+#include <stdarg.h>
 #ifndef MAX
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif
@@ -58,6 +60,18 @@ struct txnInstanceInfo {
     unsigned long txnResp;
     int ackIndex;
 };
+
+typedef enum
+{
+    eNoSession,
+    eOfferReceived,
+    eOfferSent,
+    eOfferRejected,
+    eAnswerReceived,
+    eAnswerSent,
+    eCompleted,
+    eNumSessionStates
+} SessionState;
 
 class call : virtual public task, virtual public listener, public virtual socketowner
 {
@@ -119,6 +133,17 @@ public:
     static   int   startDynamicId;  // offset for first dynamicId  FIXME:in CmdLine
     static   int   stepDynamicId;   // step of increment for dynamicId
     static   int   dynamicId;       // a counter for general use, incrementing  by  stepDynamicId starting at startDynamicId  wrapping at maxDynamicId  GLOBALY
+    /*DUB */
+    JLSRTP _txUACAudio;
+    JLSRTP _rxUACAudio;
+    JLSRTP _txUASAudio;
+    JLSRTP _rxUASAudio;
+    JLSRTP _txUACVideo;
+    JLSRTP _rxUACVideo;
+    JLSRTP _txUASVideo;
+    JLSRTP _rxUASVideo;
+    char _pref_audio_cs_out[24];
+    char _pref_video_cs_out[24];
 protected:
 
 
@@ -171,11 +196,20 @@ protected:
 
 #ifdef RTP_STREAM
     rtpstream_callinfo_t rtpstream_callinfo;
+    /*JLSRTP _txUACAudio;
+    JLSRTP _rxUACAudio;
+    JLSRTP _txUASAudio;
+    JLSRTP _rxUASAudio;
+    char _pref_audio_cs_out[24];
+    char _pref_video_cs_out[24];
+*/
 #endif
 
     /* holds the auth header and if the challenge was 401 or 407 */
     char         * dialog_authentication;
     int            dialog_challenge_type;
+
+    unsigned int   next_nonce_count;
 
     unsigned int   next_retrans;
     int            nb_retrans;
@@ -304,7 +338,11 @@ protected:
     void get_remote_media_addr(std::string const &msg);
 
 #ifdef RTP_STREAM
-    void extract_rtp_remote_addr(const char* message);
+    //void extract_rtp_remote_addr(const char* message);
+    int check_audio_ciphersuite_match(SrtpAudioInfoParams &pA);
+    int check_video_ciphersuite_match(SrtpVideoInfoParams &pV);
+    std::string s_extract_rtp_remote_addr(const char * message, int &ip_ver, int &audio_port, int &video_port);
+    int extract_srtp_remote_info(const char * msg, SrtpAudioInfoParams &pA, SrtpVideoInfoParams &pV);
 #endif
 
     bool lost(int index);
@@ -320,6 +358,11 @@ protected:
     int _callDebug(const char *fmt, ...) __attribute__((format(printf, 2, 3)));
     char *debugBuffer;
     int debugLength;
+    SessionState _sessionStateCurrent;
+    SessionState _sessionStateOld;
+    void setSessionState(SessionState state);
+    SessionState getSessionStateCurrent();
+    SessionState getSessionStateOld();
 };
 
 
