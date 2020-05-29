@@ -36,6 +36,9 @@ static void debugprint(const char* format, ...)
 {
 }
 
+pthread_mutex_t uacAudioMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t ssrcMutex     = PTHREAD_MUTEX_INITIALIZER;
+
 #define RTPSTREAM_FILESPERBLOCK       16
 #define BIND_MAX_TRIES                100
 #define RTPSTREAM_THREADBLOCKSIZE     16
@@ -186,7 +189,8 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
                             (struct sockaddr*)&taskinfo->remote_audio_rtp_addr, remote_addr_len);
                 */
                 bool encryption = false;
-                TRACE_CALLDEBUG("DUB  txindex=%d",taskinfo->txindex);   
+                //TRACE_CALLDEBUG("DUB  txindex=%d",taskinfo->txindex);   
+                pthread_mutex_lock(&uacAudioMutex); 
                 if( taskinfo->txindex >=0)
                 {
            		JLSRTP *txUACAudio=vectTxAudio[taskinfo->txindex];
@@ -200,7 +204,7 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
                     		rc = txUACAudio->processOutgoingPacket(taskinfo->seq, rtp_header, payload_data, audio_out);
 				if(rc >=0)
                                    encryption = true;
-				TRACE_CALLDEBUG(" txindex=%d, rc=%d,encryption=%d",taskinfo->txindex,rc,encryption);
+				//TRACE_CALLDEBUG(" txindex=%d, rc=%d,encryption=%d",taskinfo->txindex,rc,encryption);
 			}
                 }
                 if( !encryption)
@@ -249,6 +253,7 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
                         next_wake = timenow_ms;
                     }
                 }
+                pthread_mutex_unlock(&uacAudioMutex);
             }
         } else {
             /* not busy playing back a file -  put possible rtp echo code here. */
@@ -498,7 +503,10 @@ int rtpstream_new_call(rtpstream_callinfo_t* callinfo)
     /* socket descriptors */
     taskinfo->audio_rtp_socket = -1;
     /* rtp stream members */
+    /* DUB Taking lock on the ssrc  */
+    pthread_mutex_lock(&ssrcMutex);
     taskinfo->ssrc_id = global_ssrc_id++;
+    pthread_mutex_unlock(&ssrcMutex);
     /* pthread mutexes */
     pthread_mutex_init(&(callinfo->taskinfo->mutex), NULL);
 

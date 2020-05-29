@@ -144,6 +144,7 @@ public:
     JLSRTP _rxUASVideo;
     char _pref_audio_cs_out[24];
     char _pref_video_cs_out[24];
+    bool isSrtpCall = false;
 protected:
 
 

@@ -2055,10 +2055,11 @@ int main(int argc, char *argv[])
     /* Create the rate increase task. */
     ratetask::initialize();
     /* Create a watchdog task. */
+    /* DUB Avoiding Watchdog as it was giving error 
     if (watchdog_interval) {
         new watchdog(watchdog_interval, watchdog_reset, watchdog_major_threshold, watchdog_major_maxtriggers, watchdog_minor_threshold, watchdog_minor_maxtriggers);
     }
-
+    */
     /* Setting the rate and its dependant params (open_calls_allowed) */
     /* If we are a client, then create the task to open new calls. */
     if (creationMode == MODE_CLIENT) {

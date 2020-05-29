@@ -2542,6 +2542,7 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
         {
             pA.audio_found = true;
             pA.primary_audio_cryptotag = 1;
+                isSrtpCall = true;
             if (sendMode == MODE_CLIENT)
             {
                 TRACE_MSG("call::createSendingMessage():  E_Message_CryptoTag1Audio() - PRIMARY - CLIENT: %d\n", pA.primary_audio_cryptotag);
@@ -2560,6 +2561,7 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
         {
             pA.audio_found = true;
             pA.secondary_audio_cryptotag = 2;
+                isSrtpCall = true;
             if (sendMode == MODE_CLIENT)
             {
                 TRACE_MSG("call::createSendingMessage():  E_Message_CryptoTag2Audio() - SECONDARY - CLIENT: %d\n", pA.secondary_audio_cryptotag);
@@ -3046,6 +3048,7 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
         {
             pV.video_found = true;
             pV.primary_video_cryptotag = 1;
+            isSrtpCall = true;
             if (sendMode == MODE_CLIENT)
             {
                 TRACE_MSG("call::createSendingMessage():  E_Message_CryptoTag1Video() - PRIMARY - CLIENT: %d\n", pV.primary_video_cryptotag);
@@ -3064,6 +3067,7 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
         {
             pV.video_found = true;
             pV.secondary_video_cryptotag = 2;
+            isSrtpCall = true;
             if (sendMode == MODE_CLIENT)
             {
                 TRACE_MSG("call::createSendingMessage():  E_Message_CryptoTag2Video() - SECONDARY - CLIENT: %d\n", pV.secondary_video_cryptotag);
@@ -3080,6 +3084,7 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
         break;
         case E_Message_CryptoSuiteAesCm128Sha1801Video:
         {
+            isSrtpCall = true;
             if (sendMode == MODE_CLIENT)
             {
                 TRACE_MSG("call::createSendingMessage():  E_Message_CryptoSuiteAesCm128Sha1801Video() - PRIMARY - CLIENT\n");
@@ -3135,6 +3140,7 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
         break;
         case E_Message_CryptoSuiteAesCm128Sha1802Video:
         {
+            isSrtpCall = true;
             if (sendMode == MODE_CLIENT)
             {
                 TRACE_MSG("call::createSendingMessage():  E_Message_CryptoSuiteAesCm128Sha1802Video() - SECONDARY - CLIENT\n");
@@ -3155,6 +3161,7 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
         break;
         case E_Message_CryptoSuiteAesCm128Sha1321Video:
         {
+            isSrtpCall = true;
             if (sendMode == MODE_CLIENT)
             {
                 TRACE_MSG("call::createSendingMessage():  E_Message_CryptoSuiteAesCm128Sha1321Video() - PRIMARY - CLIENT\n");
@@ -3210,6 +3217,7 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
         break;
         case E_Message_CryptoSuiteAesCm128Sha1322Video:
         {
+            isSrtpCall = true;
             if (sendMode == MODE_CLIENT)
             {
                 TRACE_MSG("call::createSendingMessage():  E_Message_CryptoSuiteAesCm128Sha1322Video() - SECONDARY - CLIENT\n");
@@ -3230,6 +3238,7 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
         break;
         case E_Message_CryptoSuiteNullSha1801Video:
         {
+            isSrtpCall = true;
             if (sendMode == MODE_CLIENT)
             {
                 TRACE_MSG("call::createSendingMessage():  E_Message_CryptoSuiteNullSha1801Video() - PRIMARY - CLIENT\n");
@@ -3285,6 +3294,7 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
         break;
         case E_Message_CryptoSuiteNullSha1802Video:
         {
+            isSrtpCall = true;
             if (sendMode == MODE_CLIENT)
             {
                 TRACE_MSG("call::createSendingMessage():  E_Message_CryptoSuiteNullSha1802Video() - SECONDARY - CLIENT\n");
@@ -3305,6 +3315,7 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
         break;
         case E_Message_CryptoSuiteNullSha1321Video:
         {
+            isSrtpCall = true;
             if (sendMode == MODE_CLIENT)
             {
                 TRACE_MSG("call::createSendingMessage():  E_Message_CryptoSuiteNullSha1321Video() - PRIMARY - CLIENT\n");
@@ -3360,6 +3371,7 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
         break;
         case E_Message_CryptoSuiteNullSha1322Video:
         {
+            isSrtpCall = true;
             if (sendMode == MODE_CLIENT)
             {
                 TRACE_MSG("call::createSendingMessage():  E_Message_CryptoSuiteNullSha1322Video() - SECONDARY - CLIENT\n");
@@ -3423,6 +3435,7 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
         case E_Message_CryptoKeyParams2Video:
         {
             std::string mks;
+            isSrtpCall = true;
 
             if (sendMode == MODE_CLIENT)
             {
@@ -5617,7 +5630,8 @@ call::T_ActionResult call::executeAction(const char* msg, message* curmsg)
         } else if (currentAction->getActionType() == CAction::E_AT_RTP_STREAM_RESUME) {
             rtpstream_resume(&rtpstream_callinfo);
         } else if (currentAction->getActionType() == CAction::E_AT_RTP_STREAM_PLAY) {
-    	    if (sendMode == MODE_CLIENT)
+            TRACE_MSG("call::executeAction():  isSrtpCall=%d\n",isSrtpCall);
+    	    if (isSrtpCall)
             {
                 rtpstream_actinfo_t* actinfo = currentAction->getRTPStreamActInfo();
                 TRACE_MSG("call::executeAction():  (a) TX-UAC-AUDIO SRTP context - CLIENT setting SRTP payload size to %d\n", actinfo->bytes_per_packet);
@@ -5640,9 +5654,12 @@ call::T_ActionResult call::executeAction(const char* msg, message* curmsg)
                 _rxUACAudio.selectDecryptionKey();
                 TRACE_MSG("call::executeAction():  (b) RX-UAC-AUDIO SRTP context - CLIENT resetting cipher state\n");
                 _rxUACAudio.resetCipherState();
-            }
-            TRACE_MSG("call::executeAction():  rtpstream_playapattern\n");
-            rtpstream_playsrtp(&rtpstream_callinfo,currentAction->getRTPStreamActInfo(), _txUACAudio, _rxUACAudio);
+            	TRACE_MSG("call::executeAction():  SRTP Call  rtpstream_playapattern\n");
+            	rtpstream_playsrtp(&rtpstream_callinfo,currentAction->getRTPStreamActInfo(), _txUACAudio, _rxUACAudio);
+            }else {
+            	TRACE_MSG(" Plain RTP Call Calling rtpstream_play() \n");
+            	rtpstream_play(&rtpstream_callinfo,currentAction->getRTPStreamActInfo());
+           }
 #endif
         } else {
             ERROR("call::executeAction unknown action");
