@@ -1664,6 +1664,22 @@ void scenario::parseAction(CActions *actions)
                 ERROR("Scenario specifies a play_dtmf action, but this version of SIPp does not have PCAP support");
 #endif
 #ifdef RTP_STREAM
+            } else if ((ptr = xp_get_keyword_value("rtp_stream2"))) {
+                hasMedia = 1;
+                if (strcmp(ptr, "pause") == 0) {
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_PAUSE);
+                } else if (strcmp(ptr, "resume") == 0) {
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_RESUME);
+                } else {
+                    tmpAction->setRTPStreamActInfo(ptr);
+                    tmpAction->setActionType(CAction::E_AT_RTP_STREAM_PLAY);
+                }
+                free(ptr);
+#else
+            } else if ((cptr = xp_get_value("rtp_stream2"))) {
+                ERROR("Scenario specifies a rtp_stream2 action, but this version of SIPp does not have RTP stream support");
+#endif
+#ifdef RTP_STREAM
             } else if ((ptr = xp_get_keyword_value("rtp_stream"))) {
                 hasMedia = 1;
                 if (strcmp(ptr, "pause") == 0) {

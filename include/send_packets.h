@@ -114,7 +114,7 @@ typedef struct {
     /* Used in send_packets thread */
     struct sockaddr_storage to;
     struct sockaddr_storage from;
-
+    struct sockaddr_storage to2;
     /* non-zero if the thread should destroy the *pcap when done playing or aborted */
     int free_pcap_when_done;
     uint16_t last_seq_no;

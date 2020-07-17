@@ -62,19 +62,30 @@ struct taskentry_t
     threaddata_t         *parent_thread;
     unsigned long        nextwake_ms;
     volatile int         flags;
+    /* DUB ms */
+    unsigned long long   ts;
+    unsigned long long   ts2;	
 
     /* rtp stream information */
     unsigned long long   last_timestamp;
+    unsigned long long   last_timestamp2;
     unsigned short       seq;
+    unsigned short       seq2;
     char                 payload_type;
     unsigned int         ssrc_id;
+    unsigned int         ssrc_id2;
 
     /* current playback information */
     int                  loop_count;
+    int                  loop_count2;
     char                 *file_bytes_start;
+    char                 *file_bytes_start2;
     char                 *current_file_bytes;
+    char                 *current_file_bytes2;
     int                  file_num_bytes;
+    int                  file_num_bytes2;
     int                  file_bytes_left;
+    int                  file_bytes_left2;
     /* playback timing information */
     int                  ms_per_packet;
     int                  bytes_per_packet;
@@ -85,15 +96,24 @@ struct taskentry_t
     char                 new_payload_type;
     int                  new_loop_count;
     int                  new_file_size;
+    int                  new_file_size2;
     char                 *new_file_bytes;
+    char                 *new_file_bytes2;
     int                  new_ms_per_packet;
     int                  new_bytes_per_packet;
     int                  new_timeticks_per_packet;
     /* sockets for audio/video rtp_rtcp */
     int                  audio_rtp_socket;
+    int                  audio_rtp_socket2;
+    int                  audio_rtcp_socket;
+    int                  audio_rtcp_socket2;
 
     /* rtp peer address structures */
     struct sockaddr_storage    remote_audio_rtp_addr;
+    struct sockaddr_storage    remote_audio_rtp_addr2;
+
+    struct sockaddr_storage    remote_audio_rtcp_addr;
+    struct sockaddr_storage    remote_audio_rtcp_addr2;
 
     /* we will have a mutex per call. should we consider refactoring to */
     /* share mutexes across calls? makes the per-call code more complex */
@@ -113,6 +133,7 @@ struct rtpstream_callinfo_t
 {
     taskentry_t* taskinfo;
     int audioport;
+    int audioport2; 
     int videoport;
     char payload_name[RTPSTREAM_MAX_PAYLOADNAME]; 
 };
@@ -120,6 +141,7 @@ struct rtpstream_callinfo_t
 struct rtpstream_actinfo_t
 {
     char filename[RTPSTREAM_MAX_FILENAMELEN];
+    char filename2[RTPSTREAM_MAX_FILENAMELEN];
     int loop_count;
     int bytes_per_packet;
     int ms_per_packet;
@@ -134,7 +156,7 @@ void rtpstream_shutdown(void);
 int rtpstream_get_audioport(rtpstream_callinfo_t *callinfo);
 int rtpstream_get_videoport(rtpstream_callinfo_t *callinfo);
 void rtpstream_set_remote(rtpstream_callinfo_t* callinfo, int ip_ver, const char* ip_addr,
-                          int audio_port, int video_port);
+                          int audio_port,int audio_port2, int video_port);
 
 int rtpstream_cache_file(char *filename);
 void rtpstream_play(rtpstream_callinfo_t *callinfo, rtpstream_actinfo_t *actioninfo);

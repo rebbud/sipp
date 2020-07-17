@@ -375,7 +375,9 @@ MAYBE_EXTERN unsigned long rtp2_bytes_pcap              DEFVAL(0);
 #ifdef RTP_STREAM
 MAYBE_EXTERN volatile unsigned long rtpstream_numthreads DEFVAL(0);
 MAYBE_EXTERN volatile unsigned long rtpstream_bytes_in  DEFVAL(0);
+MAYBE_EXTERN volatile unsigned long rtpstream_bytes_in2 DEFVAL(0);
 MAYBE_EXTERN volatile unsigned long rtpstream_bytes_out DEFVAL(0);
+MAYBE_EXTERN volatile unsigned long rtpstream_bytes_out2 DEFVAL(0);
 MAYBE_EXTERN volatile unsigned long rtpstream_pckts     DEFVAL(0);
 
 #endif

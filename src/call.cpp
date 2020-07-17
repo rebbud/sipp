@@ -97,7 +97,8 @@ std::string trim(const std::string &s) {
     return s.substr(first, (last - first + 1));
 }
 
-#define callDebug(...) do { if (useCallDebugf) { _callDebug( __VA_ARGS__ ); } } while (0)
+//#define callDebug(...) do { if (useCallDebugf) { _callDebug( __VA_ARGS__ ); } } while (0)
+#define callDebug(...) do { _callDebug( __VA_ARGS__ );  } while (0)
 
 extern  map<string, SIPpSocket *>     map_perip_fd;
 
@@ -252,6 +253,32 @@ static std::string find_in_sdp(std::string const &pattern, std::string const &ms
     return msg.substr(begin, end - begin);
 }
 #endif
+#if defined(PCAPPLAY) || defined(RTP_STREAM) || defined(GTEST)
+static vector<std::string> find_in_sdp2(std::string const &pattern, std::string const &msg)
+{
+    vector<std::string> result;
+    std::string::size_type begin, end, offset = 0;
+
+    for( int i=0; i< 2; i++ )
+    {
+       begin = msg.find(pattern, offset );
+       if (begin == std::string::npos) {
+           return result;
+       }
+
+       begin += pattern.size();
+       end = msg.find_first_of(" \r\n", begin);
+       if (end == std::string::npos || begin == end) {
+           return result;
+       }
+    
+       result.push_back(msg.substr(begin, end - begin));
+       offset = end + 1;
+    }	
+    return result;
+}
+
+#endif
 
 #ifdef PCAPPLAY
 void call::get_remote_media_addr(std::string const &msg)
@@ -264,13 +291,15 @@ void call::get_remote_media_addr(std::string const &msg)
     hasMediaInformation = 1;
     const int family = media_ip_is_ipv6 ? AF_INET6 : AF_INET;
 
-    std::string port = find_in_sdp("m=audio ", msg);
-    if (!port.empty()) {
-        gai_getsockaddr(&play_args_a.to, host.c_str(), port.c_str(),
+    vector<std::string> portVect = find_in_sdps("m=audio ", msg);
+    if (!portVect.size() == 2) {
+        gai_getsockaddr(&play_args_a.to, host.c_str(), portVect[0].c_str(),
+                        AI_NUMERICHOST | AI_NUMERICSERV, family);
+        gai_getsockaddr(&play_args_a.to2, host.c_str(), portVect[1].c_str(),
                         AI_NUMERICHOST | AI_NUMERICSERV, family);
     }
 
-    port = find_in_sdp("m=image ", msg);
+    std::string port = find_in_sdp("m=image ", msg);
     if (!port.empty()) {
         gai_getsockaddr(&play_args_i.to, host.c_str(), port.c_str(),
                         AI_NUMERICHOST | AI_NUMERICSERV, family);
@@ -289,7 +318,7 @@ void call::get_remote_media_addr(std::string const &msg)
 /***** Similar to the routines used by the PCAP play code *****/
 
 
-std::string call::s_extract_rtp_remote_addr(const char* msg,int &ip_ver, int &audio_port, int &video_port)
+std::string call::s_extract_rtp_remote_addr(const char* msg,int &ip_ver, int &audio_port, int &audio_port2, int &video_port)
 {
     int image_port = 0;
 
@@ -304,12 +333,13 @@ std::string call::s_extract_rtp_remote_addr(const char* msg,int &ip_ver, int &au
         ip_ver = 4;
     }
 
-    std::string port = find_in_sdp("m=audio ", msg);
-    if (!port.empty()) {
-        audio_port = ::atoi(port.c_str());
+    vector<std::string> portVect = find_in_sdp2("m=audio ", msg);
+    if (portVect.size() == 2 ) {
+        audio_port  = ::atoi(portVect[0].c_str());
+        audio_port2 = ::atoi(portVect[1].c_str());
     }
 
-    port = find_in_sdp("m=image ", msg);
+    std::string port = find_in_sdp("m=image ", msg);
     if (!port.empty()) {
         image_port = ::atoi(port.c_str());
     }
@@ -331,47 +361,6 @@ std::string call::s_extract_rtp_remote_addr(const char* msg,int &ip_ver, int &au
 #define SDP_AUDIOCRYPTO_PREFIX "\na=crypto:"
 #define SDP_VIDEOCRYPTO_PREFIX "\na=crypto:"
 
-/*
-void call::extract_rtp_remote_addr(const char* msg)
-{
-    int ip_ver;
-    int audio_port = 0;
-    int image_port = 0;
-    int video_port = 0;
-
-    std::string host = find_in_sdp("c=IN IP4 ", msg);
-    if (host.empty()) {
-        host = find_in_sdp("c=IN IP6 ", msg);
-        if (host.empty()) {
-            ERROR("extract_rtp_remote_addr: invalid IP version in SDP message body");
-        }
-        ip_ver = 6;
-    } else {
-        ip_ver = 4;
-    }
-
-    std::string port = find_in_sdp("m=audio ", msg);
-    if (!port.empty()) {
-        audio_port = ::atoi(port.c_str());
-    }
-
-    port = find_in_sdp("m=image ", msg);
-    if (!port.empty()) {
-        image_port = ::atoi(port.c_str());
-    }
-
-    port = find_in_sdp("m=video ", msg);
-    if (!port.empty()) {
-        video_port = ::atoi(port.c_str());
-    }
-
-    if (audio_port == 0 && image_port == 0 && video_port == 0) {
-        ERROR("extract_rtp_remote_addr: no m=audio, m=image or m=video line found in SDP message body");
-    }
-
-    rtpstream_set_remote(&rtpstream_callinfo, ip_ver, host.c_str(), audio_port, video_port);
-}
-*/
 int call::extract_srtp_remote_info(const char * msg, SrtpAudioInfoParams &pA, SrtpVideoInfoParams &pV)
 {
     const char* ro_search = NULL;
@@ -518,7 +507,6 @@ int call::extract_srtp_remote_info(const char * msg, SrtpAudioInfoParams &pA, Sr
             (((amsection_limit != std::string::npos) && (cur_pos != std::string::npos) && (cur_pos < amsection_limit)) ||
              ((amsection_limit == std::string::npos) && (vmsection_limit == std::string::npos) && (cur_pos != std::string::npos))))
         {
-            // AUDIO "m=audio" prefix found...
             pA.audio_found = true;
 
             mline_sol = msgstr.find(SDP_AUDIOCRYPTO_PREFIX, cur_pos/*0*/, 10);
@@ -954,6 +942,7 @@ void call::init(scenario * call_scenario, SIPpSocket *socket, struct sockaddr_st
 
 #ifdef PCAPPLAY
     memset(&(play_args_a.to), 0, sizeof(struct sockaddr_storage));
+    memset(&(play_args_a.to2), 0, sizeof(struct sockaddr_storage));
     memset(&(play_args_i.to), 0, sizeof(struct sockaddr_storage));
     memset(&(play_args_v.to), 0, sizeof(struct sockaddr_storage));
     memset(&(play_args_a.from), 0, sizeof(struct sockaddr_storage));
@@ -1706,6 +1695,7 @@ bool call::executeMessage(message *curmsg)
         /* Increment the number of sessions in pause state */
         curmsg->sessions++;
         do_bookkeeping(curmsg);
+        callDebug("AQUI: Before executeMessage() type MSG_TYPE_NOP\n");
         executeAction(NULL, curmsg);
         callDebug("Pausing call until %d (is now %ld).\n", paused_until, clock_tick);
         setPaused();
@@ -2517,6 +2507,7 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
             play_args_t* play_args = NULL;
             if (strstr(begin, "audio")) {
                 play_args = &play_args_a;
+                LOG_MSG("DUB: call::createSendingMessage() : play_args = &play_args_a. port=%d\n",port);
             } else if (strstr(begin, "image")) {
                 play_args = &play_args_i;
             } else if (strstr(begin, "video")) {
@@ -4370,6 +4361,7 @@ bool call::process_incoming(const char* msg, const struct sockaddr_storage* src)
     if (!strcmp(get_header_content(msg, (char*)"Content-Type:"), "application/sdp") && hasMedia == 1) {	      
         int ip_ver = 0;
         int audio_port = 0;
+        int audio_port2 = 0;
         int video_port = 0;
         std::string host;
 
@@ -4421,9 +4413,9 @@ bool call::process_incoming(const char* msg, const struct sockaddr_storage* src)
         pV.secondary_unencrypted_video_srtp = false;
 
         //extract_rtp_remote_addr(msg);
-        host = s_extract_rtp_remote_addr(msg, ip_ver, audio_port, video_port);
+        host = s_extract_rtp_remote_addr(msg, ip_ver, audio_port, audio_port2, video_port);
         extract_srtp_remote_info(msg, pA, pV);
-         rtpstream_set_remote (&rtpstream_callinfo,ip_ver,host.c_str(),audio_port,video_port);
+         rtpstream_set_remote (&rtpstream_callinfo, ip_ver,host.c_str(), audio_port, audio_port2, video_port);
         // PASS INCOMING SRTP PARAMETERS...
         if (pA.audio_found && (pA.primary_audio_cryptotag != 0))
         {
@@ -5626,8 +5618,10 @@ call::T_ActionResult call::executeAction(const char* msg, message* curmsg)
         } else if (currentAction->getActionType() == CAction::E_AT_RTP_ECHO) {
             rtp_echo_state = (currentAction->getDoubleValue() != 0);
         } else if (currentAction->getActionType() == CAction::E_AT_RTP_STREAM_PAUSE) {
+            LOG_MSG("DUB --- Before rtpstream_pause()\n");
             rtpstream_pause(&rtpstream_callinfo);
         } else if (currentAction->getActionType() == CAction::E_AT_RTP_STREAM_RESUME) {
+            LOG_MSG("DUB --- Before rtpstream_resume()\n");
             rtpstream_resume(&rtpstream_callinfo);
         } else if (currentAction->getActionType() == CAction::E_AT_RTP_STREAM_PLAY) {
             TRACE_MSG("call::executeAction():  isSrtpCall=%d\n",isSrtpCall);
@@ -6020,6 +6014,7 @@ public:
     T get_audio_addr() {
         T sa;
         std::memcpy(&sa, &play_args_a.to, sizeof(T));
+        std::memcpy(&sa, &play_args_a.to2, sizeof(T));
         return sa;
     }
 #endif

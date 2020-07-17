@@ -497,11 +497,22 @@ void CAction::setRTPStreamActInfo(const char* P_value)
 {
     char* param_str;
     char* next_comma;
+    std::string strFromChar;
 
     if (strlen(P_value) >= sizeof(M_rtpstream_actinfo.filename)) {
         ERROR("Filename %s is too long, maximum supported length %zu", P_value,
               sizeof(M_rtpstream_actinfo.filename) - 1);
     }
+    /* DUB MS This code parses the file name for different both the streams */
+    strFromChar.append(P_value);
+    std::string::size_type pos = strFromChar.find(';');    
+    if (pos != std::string::npos) {
+        strcpy (M_rtpstream_actinfo.filename,strFromChar.substr(0, pos).c_str());
+    } else {
+	strcpy (M_rtpstream_actinfo.filename,strFromChar.c_str());
+    }
+    strcpy (M_rtpstream_actinfo.filename2, strFromChar.substr(strFromChar.find(";") + 1).c_str());
+
     strcpy(M_rtpstream_actinfo.filename, P_value);
     param_str = strchr(M_rtpstream_actinfo.filename, ',');
     next_comma = NULL;
@@ -563,10 +574,17 @@ void CAction::setRTPStreamActInfo(const char* P_value)
               M_rtpstream_actinfo.payload_type);
         break;
     }
+   
+    LOG_MSG("AQUI: File1: '%s; File2='%s'\n",M_rtpstream_actinfo.filename, M_rtpstream_actinfo.filename2);
 
     if (rtpstream_cache_file(M_rtpstream_actinfo.filename) < 0) {
         ERROR("Cannot read/cache rtpstream file %s",
               M_rtpstream_actinfo.filename);
+    }
+
+    if (rtpstream_cache_file(M_rtpstream_actinfo.filename2)<0) {
+        ERROR("Cannot read/cache rtpstream file %s\n",M_rtpstream_actinfo.filename2);
+      //  exit(0);
     }
 }
 

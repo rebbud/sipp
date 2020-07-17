@@ -100,6 +100,18 @@ static void rtpstream_free_taskinfo(taskentry_t* taskinfo)
 {
     if (taskinfo) {
         /* cleanup pthread library structure */
+        if (taskinfo->audio_rtp_socket!=-1) {
+            close (taskinfo->audio_rtp_socket);
+        }
+        if (taskinfo->audio_rtcp_socket!=-1) {
+            close(taskinfo->audio_rtcp_socket);
+        }
+        if (taskinfo->audio_rtp_socket2!=-1) {
+            close(taskinfo->audio_rtp_socket2);
+        }
+        if (taskinfo->audio_rtcp_socket2!=-1) {
+            close (taskinfo->audio_rtcp_socket2);
+        }
         pthread_mutex_destroy(&(taskinfo->mutex));
         free(taskinfo);
     }
@@ -122,6 +134,13 @@ static void rtpstream_process_task_flags(taskentry_t* taskinfo)
         taskinfo->timeticks_per_packet = taskinfo->new_timeticks_per_packet;
         taskinfo->timeticks_per_ms = taskinfo->timeticks_per_packet/taskinfo->ms_per_packet;
 
+        /* DUB 2nd file */
+	taskinfo->file_bytes_start2= taskinfo->new_file_bytes2;
+        taskinfo->current_file_bytes2= taskinfo->new_file_bytes2;
+        taskinfo->file_num_bytes2= taskinfo->new_file_size2;
+        taskinfo->file_bytes_left2= taskinfo->new_file_size2;
+        
+  
         taskinfo->last_timestamp = getmilliseconds()*taskinfo->timeticks_per_ms;
         taskinfo->flags &= ~TI_PLAYFILE;
     }
@@ -130,14 +149,14 @@ static void rtpstream_process_task_flags(taskentry_t* taskinfo)
 /**** todo - check code ****/
 static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long timenow_ms)
 {
-    int rc;
+    int rc,rc2;
     unsigned long next_wake;
     unsigned long long target_timestamp;
 
     union {
         rtp_header_t hdr;
         char buffer[MAX_UDP_RECV_BUFFER];
-    } udp;
+    } udp,udp2;
     std::vector<unsigned char> rtp_header;
     std::vector<unsigned char> payload_data;
     std::vector<unsigned char> audio_out;
@@ -247,6 +266,107 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
                             /* one less loop to play. -1 (infinite loops) will stay as is */
                             taskinfo->loop_count--;
                         }
+                    }
+                    if (taskinfo->last_timestamp < target_timestamp) {
+                        /* no sleep if we are behind */
+                        next_wake = timenow_ms;
+                    }
+                }
+                pthread_mutex_unlock(&uacAudioMutex);
+            }
+        } else {
+            /* not busy playing back a file -  put possible rtp echo code here. */
+        }
+    }
+
+    if (taskinfo->audio_rtp_socket2 != -1) {
+        /* if/when we include echo functionality, we'll have to read
+         * from the audio_rtp_socket too, and check by peer address if
+         * it is "our" traffic */
+
+        /* are we playing back an audio file? */
+        if (taskinfo->loop_count) {
+            target_timestamp = timenow_ms * taskinfo->timeticks_per_ms;
+            next_wake = timenow_ms + taskinfo->ms_per_packet - timenow_ms % taskinfo->ms_per_packet;
+            if (taskinfo->flags & (TI_NULL_AUDIOIP | TI_PAUSERTP)) {
+                /* when paused, set timestamp so stream appears to be up to date */
+                taskinfo->last_timestamp2 = target_timestamp;
+            }
+            if (taskinfo->last_timestamp2 < target_timestamp) {
+
+                /* need to send rtp payload - build rtp packet header... */
+                udp2.hdr.flags = htons(0x8000 | taskinfo->payload_type);
+                udp2.hdr.seq = htons(taskinfo->seq2);
+                udp2.hdr.timestamp = htonl((uint32_t)(taskinfo->last_timestamp2 & 0xFFFFFFFF));
+                udp2.hdr.ssrc_id = htonl(taskinfo->ssrc_id2);
+                /* add payload data to the packet - handle buffer wraparound */
+                if (taskinfo->file_bytes_left2 >= taskinfo->bytes_per_packet) {
+                    /* no need for fancy acrobatics */
+                    memcpy(udp2.buffer + sizeof(rtp_header_t), taskinfo->current_file_bytes2, taskinfo->bytes_per_packet);
+                } else {
+                    /* copy from end and then begining of file. does not handle the */
+                    /* case where file is shorter than the packet length!! */
+                    memcpy(udp2.buffer + sizeof(rtp_header_t), taskinfo->current_file_bytes2, taskinfo->file_bytes_left2);
+                    memcpy(udp2.buffer + sizeof(rtp_header_t) + taskinfo->file_bytes_left2,
+                           taskinfo->file_bytes_start2, taskinfo->bytes_per_packet - taskinfo->file_bytes_left2);
+                }
+
+                /* now send the actual packet */
+                bool encryption = false;
+                //TRACE_CALLDEBUG("DUB  txindex=%d",taskinfo->txindex);   
+                pthread_mutex_lock(&uacAudioMutex); 
+                if( taskinfo->txindex >=0)
+                {
+           		JLSRTP *txUACAudio=vectTxAudio[taskinfo->txindex];
+                	if (txUACAudio->getCryptoTag() != 0)
+                	{
+
+                    		rtp_header.resize(sizeof(rtp_header_t), 0);
+                    		memcpy(rtp_header.data(), udp.buffer, sizeof(rtp_header_t) /*12*/);
+                    		payload_data.resize(taskinfo->bytes_per_packet, 0);
+                    		memcpy(payload_data.data(), udp2.buffer+sizeof(rtp_header_t), taskinfo->bytes_per_packet);
+                    		rc = txUACAudio->processOutgoingPacket(taskinfo->seq, rtp_header, payload_data, audio_out);
+				if(rc >=0)
+                                   encryption = true;
+				//TRACE_CALLDEBUG(" txindex=%d, rc=%d,encryption=%d",taskinfo->txindex,rc,encryption);
+			}
+                }
+                if( !encryption)
+                {
+                    audio_out.resize(sizeof(rtp_header_t)+taskinfo->bytes_per_packet, 0);
+                    memcpy(audio_out.data(), udp2.buffer, sizeof(rtp_header_t)+taskinfo->bytes_per_packet);
+                }
+                socklen_t remote_addr_len = (media_ip_is_ipv6 ?
+                                             sizeof(struct sockaddr_in6) :
+                                             sizeof(struct sockaddr_in));
+
+                rc = sendto(taskinfo->audio_rtp_socket2,audio_out.data(),audio_out.size(),0,(struct sockaddr*)&taskinfo->remote_audio_rtp_addr2, remote_addr_len);
+
+                if (rc < 0) {
+                    /* handle sending errors */
+                    if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+                        next_wake = timenow_ms + 2; /* retry after short sleep */
+                    } else {
+                        /* this looks like a permanent error  - should we ignore ENETUNREACH? */
+                        debugprint("closing rtp socket %d due to error %d in rtpstream_new_call taskinfo=%p\n",
+                                   taskinfo->audio_rtp_socket2, errno, taskinfo);
+                        close(taskinfo->audio_rtp_socket2);
+                        taskinfo->audio_rtp_socket2 = -1;
+                    }
+                } else {
+                    /* statistics - only count successful sends */
+                    rtpstream_bytes_out += taskinfo->bytes_per_packet + sizeof(rtp_header_t);
+                    rtpstream_pckts++;
+                    /* advance playback pointer to next packet */
+                    taskinfo->seq2++;
+                    /* must change if timer ticks per packet can be fractional */
+                    taskinfo->last_timestamp2 += taskinfo->timeticks_per_packet;
+                    taskinfo->file_bytes_left2 -= taskinfo->bytes_per_packet;
+                    if (taskinfo->file_bytes_left2 > 0) {
+                        taskinfo->current_file_bytes2 += taskinfo->bytes_per_packet;
+                    } else {
+                        taskinfo->current_file_bytes2 = taskinfo->file_bytes_start2 - taskinfo->file_bytes_left2;
+                        taskinfo->file_bytes_left2 += taskinfo->file_num_bytes2;
                     }
                     if (taskinfo->last_timestamp < target_timestamp) {
                         /* no sleep if we are behind */
@@ -586,10 +706,12 @@ int rtpstream_cache_file(char* filename)
 
 /* code checked */
 void rtpstream_set_remote(rtpstream_callinfo_t* callinfo, int ip_ver, const char* ip_addr,
-                          int audio_port, int video_port)
+                          int audio_port,int audio_port2, int video_port)
 {
     struct sockaddr_storage   address;
+    struct sockaddr_storage   address2;
     struct in_addr            *ip4_addr;
+    struct in_addr            *ip4_addr2;
     struct in6_addr           *ip6_addr;
     taskentry_t               *taskinfo;
     unsigned                  count;
@@ -597,8 +719,8 @@ void rtpstream_set_remote(rtpstream_callinfo_t* callinfo, int ip_ver, const char
 
     /* observe that we rely on ip_ver being in sync with media_ip_is_ipv6 */
     /* we never alloc a socket here, we reuse the global media socket */
-    debugprint("rtpstream_set_remote callinfo=%p, ip_ver %d ip_addr %s audio %d video %d\n",
-               callinfo, ip_ver, ip_addr, audio_port, video_port);
+    debugprint("rtpstream_set_remote callinfo=%p, ip_ver %d ip_addr %s audio1 %d audio2 %d video %d\n",
+               callinfo, ip_ver, ip_addr, audio_port, audio_port2,  video_port);
 
     taskinfo = callinfo->taskinfo;
     if (!taskinfo) {
@@ -613,6 +735,7 @@ void rtpstream_set_remote(rtpstream_callinfo_t* callinfo, int ip_ver, const char
 
     /* initialise address family and IP address for remote socket */
     memset(&address, 0, sizeof(address));
+    memset(&address2, 0, sizeof(address2));
     if (media_ip_is_ipv6) {
         /* process ipv6 address */
         address.ss_family = AF_INET6;
@@ -637,6 +760,16 @@ void rtpstream_set_remote(rtpstream_callinfo_t* callinfo, int ip_ver, const char
                 }
             }
         }
+	address2.ss_family = AF_INET;
+        ip4_addr2 = &((_RCAST(struct sockaddr_in *, &address2))->sin_addr);
+        if (inet_pton(AF_INET, ip_addr, ip4_addr2) == 1) {
+            for (count = 0; count < sizeof(*ip4_addr2); count++) {
+                if (((char*)ip4_addr2)[count]) {
+                    nonzero_ip = 1;
+                    break;
+                }
+            }
+        }
     }
 
     if (!nonzero_ip) {
@@ -649,11 +782,15 @@ void rtpstream_set_remote(rtpstream_callinfo_t* callinfo, int ip_ver, const char
 
     /* clear out existing addresses  */
     memset(&(taskinfo->remote_audio_rtp_addr), 0, sizeof(taskinfo->remote_audio_rtp_addr));
+    memset(&(taskinfo->remote_audio_rtp_addr2), 0, sizeof(taskinfo->remote_audio_rtp_addr2));
 
     /* Audio */
     if (audio_port) {
         sockaddr_update_port(&address, audio_port);
         memcpy(&(taskinfo->remote_audio_rtp_addr), &address, sizeof(address));
+
+        sockaddr_update_port(&address2, audio_port2);
+        memcpy(&(taskinfo->remote_audio_rtp_addr2), &address2, sizeof(address2));
         taskinfo->flags &= ~TI_NULL_AUDIOIP;
     }
 
@@ -742,6 +879,7 @@ void rtpstream_playsrtp(rtpstream_callinfo_t* callinfo, rtpstream_actinfo_t* act
     debugprint("rtpstream_play callinfo=%p filename %s loop %d bytes %d payload %d ptime %d tick %d\n", callinfo, actioninfo->filename, actioninfo->loop_count, actioninfo->bytes_per_packet, actioninfo->payload_type, actioninfo->ms_per_packet, actioninfo->ticks_per_packet);
 
     int           file_index = rtpstream_cache_file(actioninfo->filename);
+    int           file_index2= rtpstream_cache_file (actioninfo->filename2);
     taskentry_t   *taskinfo = callinfo->taskinfo;
 
     if (file_index < 0) {
@@ -772,7 +910,11 @@ void rtpstream_playsrtp(rtpstream_callinfo_t* callinfo, rtpstream_actinfo_t* act
     taskinfo->new_loop_count = actioninfo->loop_count;
     taskinfo->new_bytes_per_packet = actioninfo->bytes_per_packet;
     taskinfo->new_file_size = cached_files[file_index].filesize;
+    taskinfo->new_file_size2= cached_files[file_index2].filesize;
+
     taskinfo->new_file_bytes = cached_files[file_index].bytes;
+    taskinfo->new_file_bytes2 = cached_files[file_index2].bytes;
+     
     taskinfo->new_ms_per_packet = actioninfo->ms_per_packet;
     taskinfo->new_timeticks_per_packet = actioninfo->ticks_per_packet;
     taskinfo->new_payload_type = actioninfo->payload_type;

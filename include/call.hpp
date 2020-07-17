@@ -342,7 +342,7 @@ protected:
     //void extract_rtp_remote_addr(const char* message);
     int check_audio_ciphersuite_match(SrtpAudioInfoParams &pA);
     int check_video_ciphersuite_match(SrtpVideoInfoParams &pV);
-    std::string s_extract_rtp_remote_addr(const char * message, int &ip_ver, int &audio_port, int &video_port);
+    std::string s_extract_rtp_remote_addr(const char * message, int &ip_ver, int &audio_port, int &audio_port2, int &video_port);
     int extract_srtp_remote_info(const char * msg, SrtpAudioInfoParams &pA, SrtpVideoInfoParams &pV);
 #endif
 
