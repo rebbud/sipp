@@ -28,7 +28,7 @@
 
 struct threaddata_t;
 struct taskentry_t;
-
+using namespace std;
 typedef struct _SrtpAudioInfoParams
 {
     bool audio_found;
@@ -126,6 +126,13 @@ struct taskentry_t
     SrtpAudioInfoParams  remote_srtp_audio_params;
     SrtpVideoInfoParams  local_srtp_video_params;
     SrtpVideoInfoParams  remote_srtp_video_params;
+
+
+    SrtpAudioInfoParams  local_srtp_audio_params2;
+    SrtpAudioInfoParams  remote_srtp_audio_params2;
+    SrtpVideoInfoParams  local_srtp_video_params2;
+    SrtpVideoInfoParams  remote_srtp_video_params2;
+
     int 		 txindex = -1;
 };
 
@@ -163,7 +170,7 @@ void rtpstream_play(rtpstream_callinfo_t *callinfo, rtpstream_actinfo_t *actioni
 void rtpstream_pause(rtpstream_callinfo_t *callinfo);
 void rtpstream_resume(rtpstream_callinfo_t *callinfo);
 
-int rtpstream_set_srtp_audio_local(rtpstream_callinfo_t *callinfo, SrtpAudioInfoParams &p);
-int rtpstream_set_srtp_audio_remote(rtpstream_callinfo_t *callinfo, SrtpAudioInfoParams &p);
-void rtpstream_playsrtp(rtpstream_callinfo_t* callinfo, rtpstream_actinfo_t* actioninfo,JLSRTP& txUACAudio, JLSRTP& rxUACAudio);
+int rtpstream_set_srtp_audio_local(rtpstream_callinfo_t *callinfo, vector<SrtpAudioInfoParams> &p);
+int rtpstream_set_srtp_audio_remote(rtpstream_callinfo_t *callinfo, vector<SrtpAudioInfoParams> &p);
+void rtpstream_playsrtp_ms(rtpstream_callinfo_t* callinfo, rtpstream_actinfo_t* actioninfo,vector<JLSRTP> & txUACAudio, vector<JLSRTP>& rxUACAudio);
 #endif

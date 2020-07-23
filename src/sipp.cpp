@@ -1194,8 +1194,35 @@ static int bind_rtp_sockets(struct sockaddr_storage* media_sa, int try_port, int
         return -1;
     }
 
+
     /* Create and bind the second/video socket to try_port+2 */
     /* (+1 is reserved for RTCP) */
+    if ((media_socket_audio2 = socket(media_sa->ss_family, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+        ERROR_NO("Unable to create the video RTP socket");
+    }
+
+    if (media_sa->ss_family == AF_INET) {
+        (_RCAST(struct sockaddr_in*, media_sa))->sin_port = htons(try_port + 2);
+    } else {
+        (_RCAST(struct sockaddr_in6*, media_sa))->sin6_port = htons(try_port + 2);
+    }
+
+    if (::bind(media_socket_audio2, (sockaddr*)media_sa, socklen_from_addr(media_sa)) != 0) {
+        if (last_attempt) {
+            ERROR_NO("Unable to bind video RTP socket (IP=%s, port=%d)",
+                     media_ip, try_port + 2);
+        }
+        ::close(media_socket_audio2);
+        ::close(media_socket_audio);
+        media_socket_audio = media_socket_audio2 = -1;
+        return -1;
+    }
+
+
+
+    /* Create and bind the second/video socket to try_port+2 */
+    /* (+1 is reserved for RTCP) */
+    /*
     if ((media_socket_video = socket(media_sa->ss_family, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
         ERROR_NO("Unable to create the video RTP socket");
     }
@@ -1216,7 +1243,7 @@ static int bind_rtp_sockets(struct sockaddr_storage* media_sa, int try_port, int
         media_socket_audio = media_socket_video = -1;
         return -1;
     }
-
+    */
     return 0;
 }
 

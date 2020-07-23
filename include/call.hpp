@@ -73,6 +73,8 @@ typedef enum
     eNumSessionStates
 } SessionState;
 
+static JLSRTP defaultJLSRTP;
+
 class call : virtual public task, virtual public listener, public virtual socketowner
 {
 public:
@@ -86,6 +88,8 @@ public:
     virtual ~call();
 
     virtual bool process_incoming(const char* msg, const struct sockaddr_storage* src = NULL);
+    virtual void process_crypto(vector<SrtpAudioInfoParams> &pA, std::string &host, int audio_port1, int audio_port2);
+   
     virtual bool process_twinSippCom(char* msg);
 
     virtual bool run();
@@ -133,15 +137,12 @@ public:
     static   int   startDynamicId;  // offset for first dynamicId  FIXME:in CmdLine
     static   int   stepDynamicId;   // step of increment for dynamicId
     static   int   dynamicId;       // a counter for general use, incrementing  by  stepDynamicId starting at startDynamicId  wrapping at maxDynamicId  GLOBALY
-    /*DUB */
-    JLSRTP _txUACAudio;
-    JLSRTP _rxUACAudio;
-    JLSRTP _txUASAudio;
-    JLSRTP _rxUASAudio;
-    JLSRTP _txUACVideo;
-    JLSRTP _rxUACVideo;
-    JLSRTP _txUASVideo;
-    JLSRTP _rxUASVideo;
+    /*DUB ms */
+    vector<JLSRTP> txUACAudioVect={defaultJLSRTP,defaultJLSRTP};
+    vector<JLSRTP> rxUACAudioVect={defaultJLSRTP,defaultJLSRTP};
+    vector<JLSRTP> txUASAudioVect={defaultJLSRTP,defaultJLSRTP};
+    vector<JLSRTP> rxUASAudioVect={defaultJLSRTP,defaultJLSRTP};
+    
     char _pref_audio_cs_out[24];
     char _pref_video_cs_out[24];
     bool isSrtpCall = false;
@@ -197,13 +198,6 @@ protected:
 
 #ifdef RTP_STREAM
     rtpstream_callinfo_t rtpstream_callinfo;
-    /*JLSRTP _txUACAudio;
-    JLSRTP _rxUACAudio;
-    JLSRTP _txUASAudio;
-    JLSRTP _rxUASAudio;
-    char _pref_audio_cs_out[24];
-    char _pref_video_cs_out[24];
-*/
 #endif
 
     /* holds the auth header and if the challenge was 401 or 407 */
@@ -306,7 +300,6 @@ protected:
     static void dumpFileContents(void);
 
     void getFieldFromInputFile(const char* fileName, int field, SendingMessage *line, char*& dest);
-
     /* Associate a user with this call. */
     void setUser(int userId);
 
@@ -341,9 +334,8 @@ protected:
 #ifdef RTP_STREAM
     //void extract_rtp_remote_addr(const char* message);
     int check_audio_ciphersuite_match(SrtpAudioInfoParams &pA);
-    int check_video_ciphersuite_match(SrtpVideoInfoParams &pV);
-    std::string s_extract_rtp_remote_addr(const char * message, int &ip_ver, int &audio_port, int &audio_port2, int &video_port);
-    int extract_srtp_remote_info(const char * msg, SrtpAudioInfoParams &pA, SrtpVideoInfoParams &pV);
+    std::string s_extract_rtp_remote_addr(const char* msg,int &ip_ver, int &audio_port, int &audio_port2);
+    int extract_srtp_remote_info(const char * msg, std::vector<SrtpAudioInfoParams> &pAVect);
 #endif
 
     bool lost(int index);

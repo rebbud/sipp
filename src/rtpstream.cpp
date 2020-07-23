@@ -30,7 +30,7 @@
 #include <sys/time.h>
 #include <vector>
 #include <errno.h>
-vector<JLSRTP*> vectTxAudio;
+vector<pair<JLSRTP *, JLSRTP *>> vectTxAudio;
 /* stub to add extra debugging/logging... */
 static void debugprint(const char* format, ...)
 {
@@ -149,7 +149,7 @@ static void rtpstream_process_task_flags(taskentry_t* taskinfo)
 /**** todo - check code ****/
 static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long timenow_ms)
 {
-    int rc,rc2;
+    int rc=0;
     unsigned long next_wake;
     unsigned long long target_timestamp;
 
@@ -198,21 +198,14 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
                            taskinfo->file_bytes_start, taskinfo->bytes_per_packet - taskinfo->file_bytes_left);
                 }
 
-                /* now send the actual packet */
-                /*
-                size_t packet_len = taskinfo->bytes_per_packet + sizeof(rtp_header_t);
-                socklen_t remote_addr_len = (media_ip_is_ipv6 ?
-                                             sizeof(struct sockaddr_in6) :
-                                             sizeof(struct sockaddr_in));
-                rc = sendto(taskinfo->audio_rtp_socket, udp.buffer, packet_len, 0,
-                            (struct sockaddr*)&taskinfo->remote_audio_rtp_addr, remote_addr_len);
-                */
                 bool encryption = false;
-                //TRACE_CALLDEBUG("DUB  txindex=%d",taskinfo->txindex);   
+                //TRACE_MSG("Stream 1 DUB  txindex=%d\n",taskinfo->txindex);   
                 pthread_mutex_lock(&uacAudioMutex); 
                 if( taskinfo->txindex >=0)
                 {
-           		JLSRTP *txUACAudio=vectTxAudio[taskinfo->txindex];
+           		pair<JLSRTP*,JLSRTP*> &txPair = vectTxAudio[taskinfo->txindex];
+           		JLSRTP *txUACAudio=txPair.first;
+     
                 	if (txUACAudio->getCryptoTag() != 0)
                 	{
 
@@ -223,7 +216,7 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
                     		rc = txUACAudio->processOutgoingPacket(taskinfo->seq, rtp_header, payload_data, audio_out);
 				if(rc >=0)
                                    encryption = true;
-				//TRACE_CALLDEBUG(" txindex=%d, rc=%d,encryption=%d",taskinfo->txindex,rc,encryption);
+				//TRACE_MSG(" txindex=%d, rc=%d,encryption=%d\n",taskinfo->txindex,rc,encryption);
 			}
                 }
                 if( !encryption)
@@ -313,22 +306,24 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
 
                 /* now send the actual packet */
                 bool encryption = false;
-                //TRACE_CALLDEBUG("DUB  txindex=%d",taskinfo->txindex);   
+               // TRACE_MSG("DUB Stream 2  txindex=%d\n",taskinfo->txindex);   
                 pthread_mutex_lock(&uacAudioMutex); 
                 if( taskinfo->txindex >=0)
                 {
-           		JLSRTP *txUACAudio=vectTxAudio[taskinfo->txindex];
+			pair<JLSRTP*,JLSRTP*> &txPair = vectTxAudio[taskinfo->txindex];
+                        JLSRTP *txUACAudio=txPair.second;
+
                 	if (txUACAudio->getCryptoTag() != 0)
                 	{
 
                     		rtp_header.resize(sizeof(rtp_header_t), 0);
-                    		memcpy(rtp_header.data(), udp.buffer, sizeof(rtp_header_t) /*12*/);
+                    		memcpy(rtp_header.data(), udp2.buffer, sizeof(rtp_header_t) /*12*/);
                     		payload_data.resize(taskinfo->bytes_per_packet, 0);
                     		memcpy(payload_data.data(), udp2.buffer+sizeof(rtp_header_t), taskinfo->bytes_per_packet);
-                    		rc = txUACAudio->processOutgoingPacket(taskinfo->seq, rtp_header, payload_data, audio_out);
+                    		rc = txUACAudio->processOutgoingPacket(taskinfo->seq2, rtp_header, payload_data, audio_out);
 				if(rc >=0)
                                    encryption = true;
-				//TRACE_CALLDEBUG(" txindex=%d, rc=%d,encryption=%d",taskinfo->txindex,rc,encryption);
+				 //TRACE_MSG(" Stream 2 txindex=%d, rc=%d,encryption=%d\n",taskinfo->txindex,rc,encryption);
 			}
                 }
                 if( !encryption)
@@ -340,8 +335,8 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
                                              sizeof(struct sockaddr_in6) :
                                              sizeof(struct sockaddr_in));
 
-                rc = sendto(taskinfo->audio_rtp_socket2,audio_out.data(),audio_out.size(),0,(struct sockaddr*)&taskinfo->remote_audio_rtp_addr2, remote_addr_len);
-
+             //   rc = sendto(taskinfo->audio_rtp_socket2,audio_out.data(),audio_out.size(),0,(struct sockaddr*)&taskinfo->remote_audio_rtp_addr2, remote_addr_len);
+                     rc = 0;
                 if (rc < 0) {
                     /* handle sending errors */
                     if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
@@ -355,8 +350,8 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
                     }
                 } else {
                     /* statistics - only count successful sends */
-                    rtpstream_bytes_out += taskinfo->bytes_per_packet + sizeof(rtp_header_t);
-                    rtpstream_pckts++;
+                    rtpstream_bytes_out2 += taskinfo->bytes_per_packet + sizeof(rtp_header_t);
+                    rtpstream_pckts2++;
                     /* advance playback pointer to next packet */
                     taskinfo->seq2++;
                     /* must change if timer ticks per packet can be fractional */
@@ -368,7 +363,7 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
                         taskinfo->current_file_bytes2 = taskinfo->file_bytes_start2 - taskinfo->file_bytes_left2;
                         taskinfo->file_bytes_left2 += taskinfo->file_num_bytes2;
                     }
-                    if (taskinfo->last_timestamp < target_timestamp) {
+                    if (taskinfo->last_timestamp2 < target_timestamp) {
                         /* no sleep if we are behind */
                         next_wake = timenow_ms;
                     }
@@ -383,11 +378,6 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
     return next_wake;
 }
 
-
-
-/*********************************************************************************/
-/*********************************************************************************/
-/*********************************************************************************/
 
 
 /* code checked */
@@ -622,10 +612,12 @@ int rtpstream_new_call(rtpstream_callinfo_t* callinfo)
     taskinfo->flags = TI_NULLIP;
     /* socket descriptors */
     taskinfo->audio_rtp_socket = -1;
+    taskinfo->audio_rtp_socket2 = -1;  
     /* rtp stream members */
     /* DUB Taking lock on the ssrc  */
     pthread_mutex_lock(&ssrcMutex);
     taskinfo->ssrc_id = global_ssrc_id++;
+    taskinfo->ssrc_id2 = global_ssrc_id++;
     pthread_mutex_unlock(&ssrcMutex);
     /* pthread mutexes */
     pthread_mutex_init(&(callinfo->taskinfo->mutex), NULL);
@@ -801,7 +793,7 @@ void rtpstream_set_remote(rtpstream_callinfo_t* callinfo, int ip_ver, const char
     /* only makes sense if we decide to send 0-filled packets on idle */
 }
 
-int rtpstream_set_srtp_audio_local(rtpstream_callinfo_t *callinfo, SrtpAudioInfoParams &p)
+int rtpstream_set_srtp_audio_local(rtpstream_callinfo_t *callinfo, vector<SrtpAudioInfoParams> &p)
 {
     taskentry_t               *taskinfo;
 
@@ -817,18 +809,31 @@ int rtpstream_set_srtp_audio_local(rtpstream_callinfo_t *callinfo, SrtpAudioInfo
 
     /* clear out existing addresses  */
     memset (&(taskinfo->local_srtp_audio_params),0,sizeof(taskinfo->local_srtp_audio_params));
+    memset (&(taskinfo->local_srtp_audio_params2),0,sizeof(taskinfo->local_srtp_audio_params2));
 
     /* Audio */
-    if (p.audio_found) {
+    if (p[0].audio_found) {
         taskinfo->local_srtp_audio_params.audio_found = true;
-        taskinfo->local_srtp_audio_params.primary_audio_cryptotag = p.primary_audio_cryptotag;
-        taskinfo->local_srtp_audio_params.secondary_audio_cryptotag = p.secondary_audio_cryptotag;
-        strncpy(taskinfo->local_srtp_audio_params.primary_audio_cryptosuite, p.primary_audio_cryptosuite, 23);
-        strncpy(taskinfo->local_srtp_audio_params.secondary_audio_cryptosuite, p.secondary_audio_cryptosuite, 23);
-        strncpy(taskinfo->local_srtp_audio_params.primary_audio_cryptokeyparams, p.primary_audio_cryptokeyparams, 40);
-        strncpy(taskinfo->local_srtp_audio_params.secondary_audio_cryptokeyparams, p.secondary_audio_cryptokeyparams, 40);
-        taskinfo->local_srtp_audio_params.primary_unencrypted_audio_srtp = p.primary_unencrypted_audio_srtp;
-        taskinfo->local_srtp_audio_params.secondary_unencrypted_audio_srtp = p.secondary_unencrypted_audio_srtp;
+        taskinfo->local_srtp_audio_params.primary_audio_cryptotag = p[0].primary_audio_cryptotag;
+        taskinfo->local_srtp_audio_params.secondary_audio_cryptotag = p[0].secondary_audio_cryptotag;
+        strncpy(taskinfo->local_srtp_audio_params.primary_audio_cryptosuite, p[0].primary_audio_cryptosuite, 23);
+        strncpy(taskinfo->local_srtp_audio_params.secondary_audio_cryptosuite, p[0].secondary_audio_cryptosuite, 23);
+        strncpy(taskinfo->local_srtp_audio_params.primary_audio_cryptokeyparams, p[0].primary_audio_cryptokeyparams, 40);
+        strncpy(taskinfo->local_srtp_audio_params.secondary_audio_cryptokeyparams, p[0].secondary_audio_cryptokeyparams, 40);
+        taskinfo->local_srtp_audio_params.primary_unencrypted_audio_srtp = p[0].primary_unencrypted_audio_srtp;
+        taskinfo->local_srtp_audio_params.secondary_unencrypted_audio_srtp = p[0].secondary_unencrypted_audio_srtp;
+
+        taskinfo->local_srtp_audio_params2.audio_found = true;
+        taskinfo->local_srtp_audio_params2.primary_audio_cryptotag = p[1].primary_audio_cryptotag;
+        taskinfo->local_srtp_audio_params2.secondary_audio_cryptotag = p[1].secondary_audio_cryptotag;
+        strncpy(taskinfo->local_srtp_audio_params2.primary_audio_cryptosuite, p[1].primary_audio_cryptosuite, 23);
+        strncpy(taskinfo->local_srtp_audio_params2.secondary_audio_cryptosuite, p[1].secondary_audio_cryptosuite, 23);
+        strncpy(taskinfo->local_srtp_audio_params2.primary_audio_cryptokeyparams, p[1].primary_audio_cryptokeyparams, 40);
+        strncpy(taskinfo->local_srtp_audio_params2.secondary_audio_cryptokeyparams, p[1].secondary_audio_cryptokeyparams, 40);
+        taskinfo->local_srtp_audio_params2.primary_unencrypted_audio_srtp = p[1].primary_unencrypted_audio_srtp;
+        taskinfo->local_srtp_audio_params2.secondary_unencrypted_audio_srtp = p[1].secondary_unencrypted_audio_srtp;
+        
+
     }
 
     /* ok, we are done with the shared memory objects. let go mutex */
@@ -837,7 +842,10 @@ int rtpstream_set_srtp_audio_local(rtpstream_callinfo_t *callinfo, SrtpAudioInfo
     return 0;
 }
 
-int rtpstream_set_srtp_audio_remote(rtpstream_callinfo_t *callinfo, SrtpAudioInfoParams &p)
+
+
+
+int rtpstream_set_srtp_audio_remote(rtpstream_callinfo_t *callinfo, vector<SrtpAudioInfoParams> &p)
 {
     taskentry_t               *taskinfo;
 
@@ -853,18 +861,31 @@ int rtpstream_set_srtp_audio_remote(rtpstream_callinfo_t *callinfo, SrtpAudioInf
 
     /* clear out existing addresses  */
     memset (&(taskinfo->remote_srtp_audio_params),0,sizeof(taskinfo->remote_srtp_audio_params));
+    memset (&(taskinfo->remote_srtp_audio_params2),0,sizeof(taskinfo->remote_srtp_audio_params2));
 
     /* Audio */
-    if (p.audio_found) {
+    if (p[0].audio_found) {
         taskinfo->remote_srtp_audio_params.audio_found = true;
-        taskinfo->remote_srtp_audio_params.primary_audio_cryptotag = p.primary_audio_cryptotag;
-        taskinfo->remote_srtp_audio_params.secondary_audio_cryptotag = p.secondary_audio_cryptotag;
-        strncpy(taskinfo->remote_srtp_audio_params.primary_audio_cryptosuite, p.primary_audio_cryptosuite, 23);
-        strncpy(taskinfo->remote_srtp_audio_params.secondary_audio_cryptosuite, p.secondary_audio_cryptosuite, 23);
-        strncpy(taskinfo->remote_srtp_audio_params.primary_audio_cryptokeyparams, p.primary_audio_cryptokeyparams, 40);
-        strncpy(taskinfo->remote_srtp_audio_params.secondary_audio_cryptokeyparams, p.secondary_audio_cryptokeyparams, 40);
-        taskinfo->remote_srtp_audio_params.primary_unencrypted_audio_srtp = p.primary_unencrypted_audio_srtp;
-        taskinfo->remote_srtp_audio_params.secondary_unencrypted_audio_srtp = p.secondary_unencrypted_audio_srtp;
+        taskinfo->remote_srtp_audio_params.primary_audio_cryptotag = p[0].primary_audio_cryptotag;
+        taskinfo->remote_srtp_audio_params.secondary_audio_cryptotag = p[0].secondary_audio_cryptotag;
+        strncpy(taskinfo->remote_srtp_audio_params.primary_audio_cryptosuite, p[0].primary_audio_cryptosuite, 23);
+        strncpy(taskinfo->remote_srtp_audio_params.secondary_audio_cryptosuite, p[0].secondary_audio_cryptosuite, 23);
+        strncpy(taskinfo->remote_srtp_audio_params.primary_audio_cryptokeyparams, p[0].primary_audio_cryptokeyparams, 40);
+        strncpy(taskinfo->remote_srtp_audio_params.secondary_audio_cryptokeyparams, p[0].secondary_audio_cryptokeyparams, 40);
+        taskinfo->remote_srtp_audio_params.primary_unencrypted_audio_srtp = p[0].primary_unencrypted_audio_srtp;
+        taskinfo->remote_srtp_audio_params.secondary_unencrypted_audio_srtp = p[0].secondary_unencrypted_audio_srtp;
+
+        taskinfo->remote_srtp_audio_params2.audio_found = true;
+        taskinfo->remote_srtp_audio_params2.primary_audio_cryptotag = p[1].primary_audio_cryptotag;
+        taskinfo->remote_srtp_audio_params2.secondary_audio_cryptotag = p[1].secondary_audio_cryptotag;
+        strncpy(taskinfo->remote_srtp_audio_params2.primary_audio_cryptosuite, p[1].primary_audio_cryptosuite, 23);
+        strncpy(taskinfo->remote_srtp_audio_params2.secondary_audio_cryptosuite, p[1].secondary_audio_cryptosuite, 23);
+        strncpy(taskinfo->remote_srtp_audio_params2.primary_audio_cryptokeyparams, p[1].primary_audio_cryptokeyparams, 40);
+        strncpy(taskinfo->remote_srtp_audio_params2.secondary_audio_cryptokeyparams, p[1].secondary_audio_cryptokeyparams, 40);
+        taskinfo->remote_srtp_audio_params2.primary_unencrypted_audio_srtp = p[1].primary_unencrypted_audio_srtp;
+        taskinfo->remote_srtp_audio_params2.secondary_unencrypted_audio_srtp = p[1].secondary_unencrypted_audio_srtp;
+
+
     }
 
     /* ok, we are done with the shared memory objects. let go mutex */
@@ -874,24 +895,28 @@ int rtpstream_set_srtp_audio_remote(rtpstream_callinfo_t *callinfo, SrtpAudioInf
 }
 
 
-void rtpstream_playsrtp(rtpstream_callinfo_t* callinfo, rtpstream_actinfo_t* actioninfo,JLSRTP& txUACAudio, JLSRTP& rxUACAudio)
+
+void rtpstream_playsrtp_ms(rtpstream_callinfo_t* callinfo, rtpstream_actinfo_t* actioninfo, std::vector<JLSRTP>& txUACAudioVect, std::vector<JLSRTP>& rxUACAudioVect)
 {
     debugprint("rtpstream_play callinfo=%p filename %s loop %d bytes %d payload %d ptime %d tick %d\n", callinfo, actioninfo->filename, actioninfo->loop_count, actioninfo->bytes_per_packet, actioninfo->payload_type, actioninfo->ms_per_packet, actioninfo->ticks_per_packet);
 
     int           file_index = rtpstream_cache_file(actioninfo->filename);
     int           file_index2= rtpstream_cache_file (actioninfo->filename2);
     taskentry_t   *taskinfo = callinfo->taskinfo;
-
+    TRACE_MSG("actioninfo->filename=%s, actioninfo->filename2=%s\n", actioninfo->filename,  actioninfo->filename2 );
+ 	
     if (file_index < 0) {
         return; /* cannot find file to play */
     }
-
+    	
     if (!taskinfo) {
         return; /* no task data structure */
     }
 
     /* make sure we have an open socket from which to play the audio file */
     taskinfo->audio_rtp_socket = media_socket_audio;
+    taskinfo->audio_rtp_socket2 = media_socket_audio2;
+
 
     /* start playback task if not already started */
     if (!taskinfo->parent_thread) {
@@ -900,11 +925,11 @@ void rtpstream_playsrtp(rtpstream_callinfo_t* callinfo, rtpstream_actinfo_t* act
             return;
         }
     }
-    vectTxAudio.push_back(&txUACAudio);
+    vectTxAudio.push_back(make_pair(&txUACAudioVect[0],&txUACAudioVect[1]));
     //g_txUACAudio = txUACAudio;
    // rtpstream_get_local_audioport (callinfo);
     taskinfo->txindex = vectTxAudio.size() -1;
-    TRACE_CALLDEBUG("DUB Adding txindex=%d", taskinfo->txindex);
+    TRACE_MSG("DUB Adding txindex=%d", taskinfo->txindex);
 
     /* save file parameter in taskinfo structure */
     taskinfo->new_loop_count = actioninfo->loop_count;

@@ -379,6 +379,7 @@ MAYBE_EXTERN volatile unsigned long rtpstream_bytes_in2 DEFVAL(0);
 MAYBE_EXTERN volatile unsigned long rtpstream_bytes_out DEFVAL(0);
 MAYBE_EXTERN volatile unsigned long rtpstream_bytes_out2 DEFVAL(0);
 MAYBE_EXTERN volatile unsigned long rtpstream_pckts     DEFVAL(0);
+MAYBE_EXTERN volatile unsigned long rtpstream_pckts2     DEFVAL(0);
 
 #endif
 
@@ -424,6 +425,7 @@ MAYBE_EXTERN SIPpSocket   *main_socket                  DEFVAL(NULL);
 MAYBE_EXTERN SIPpSocket   *main_remote_socket           DEFVAL(NULL);
 MAYBE_EXTERN SIPpSocket   *tcp_multiplex                DEFVAL(NULL);
 MAYBE_EXTERN int media_socket_audio                     DEFVAL(0);
+MAYBE_EXTERN int media_socket_audio2                    DEFVAL(0);
 MAYBE_EXTERN int media_socket_video                     DEFVAL(0);
 
 MAYBE_EXTERN struct sockaddr_storage local_sockaddr;

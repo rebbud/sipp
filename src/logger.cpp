@@ -468,7 +468,8 @@ void print_stats_in_file(FILE * f)
             last_rtpstream_rate_in = ((double)tempbytes) / (last_tick - last_report_time);
             rtpstream_bytes_in -= tempbytes;
         }
-        sprintf(temp_str, "%lu Total RTP pckts sent", rtpstream_pckts);
+        sprintf(temp_str, "%lu Total RTP pckts sent for stream1", rtpstream_pckts);
+        sprintf(temp_str, "%lu Total RTP pckts sent for stream2", rtpstream_pckts2);
         fprintf(f,"  %-38s %.3f kB/s RTP OUT" SIPP_ENDL,
                 temp_str, last_rtpstream_rate_out);
 
