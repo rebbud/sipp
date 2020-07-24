@@ -142,6 +142,7 @@ static void rtpstream_process_task_flags(taskentry_t* taskinfo)
         
   
         taskinfo->last_timestamp = getmilliseconds()*taskinfo->timeticks_per_ms;
+        taskinfo->last_timestamp2 = getmilliseconds()*taskinfo->timeticks_per_ms;
         taskinfo->flags &= ~TI_PLAYFILE;
     }
 }
@@ -165,7 +166,6 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
     /* no support for video stream at this stage. will need some work */
 
     next_wake = timenow_ms + 100; /* default next wakeup time */
-
     if (taskinfo->audio_rtp_socket != -1) {
         /* if/when we include echo functionality, we'll have to read
          * from the audio_rtp_socket too, and check by peer address if
@@ -229,7 +229,6 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
                                              sizeof(struct sockaddr_in));
 
                 rc = sendto(taskinfo->audio_rtp_socket,audio_out.data(),audio_out.size(),0,(struct sockaddr*)&taskinfo->remote_audio_rtp_addr, remote_addr_len);
-
                 if (rc < 0) {
                     /* handle sending errors */
                     if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
@@ -271,7 +270,6 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
             /* not busy playing back a file -  put possible rtp echo code here. */
         }
     }
-
     if (taskinfo->audio_rtp_socket2 != -1) {
         /* if/when we include echo functionality, we'll have to read
          * from the audio_rtp_socket too, and check by peer address if
@@ -323,7 +321,8 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
                     		rc = txUACAudio->processOutgoingPacket(taskinfo->seq2, rtp_header, payload_data, audio_out);
 				if(rc >=0)
                                    encryption = true;
-				 //TRACE_MSG(" Stream 2 txindex=%d, rc=%d,encryption=%d\n",taskinfo->txindex,rc,encryption);
+                                else
+				 TRACE_MSG(" Stream 2 txindex=%d, rc=%d,encryption=%d\n",taskinfo->txindex,rc,encryption);
 			}
                 }
                 if( !encryption)
@@ -335,8 +334,7 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
                                              sizeof(struct sockaddr_in6) :
                                              sizeof(struct sockaddr_in));
 
-             //   rc = sendto(taskinfo->audio_rtp_socket2,audio_out.data(),audio_out.size(),0,(struct sockaddr*)&taskinfo->remote_audio_rtp_addr2, remote_addr_len);
-                     rc = 0;
+                rc = sendto(taskinfo->audio_rtp_socket2,audio_out.data(),audio_out.size(),0,(struct sockaddr*)&taskinfo->remote_audio_rtp_addr2, remote_addr_len);
                 if (rc < 0) {
                     /* handle sending errors */
                     if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
@@ -365,10 +363,10 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
                     }
                     if (taskinfo->last_timestamp2 < target_timestamp) {
                         /* no sleep if we are behind */
-                        next_wake = timenow_ms;
+                      //  next_wake = timenow_ms;
                     }
                 }
-                pthread_mutex_unlock(&uacAudioMutex);
+		pthread_mutex_unlock(&uacAudioMutex);
             }
         } else {
             /* not busy playing back a file -  put possible rtp echo code here. */
@@ -643,7 +641,7 @@ int rtpstream_cache_file(char* filename)
     struct stat   statbuffer;
     FILE          *f;
 
-    debugprint ("rtpstream_cache_file filename=%s\n", filename);
+    TRACE_MSG ("rtpstream_cache_file filename=%s\n", filename);
 
     /* cached file entries are stored in a dynamically grown array. */
     /* could use a binary (or avl) tree but number of files should  */
@@ -711,7 +709,7 @@ void rtpstream_set_remote(rtpstream_callinfo_t* callinfo, int ip_ver, const char
 
     /* observe that we rely on ip_ver being in sync with media_ip_is_ipv6 */
     /* we never alloc a socket here, we reuse the global media socket */
-    debugprint("rtpstream_set_remote callinfo=%p, ip_ver %d ip_addr %s audio1 %d audio2 %d video %d\n",
+    TRACE_MSG("rtpstream_set_remote callinfo=%p, ip_ver %d ip_addr %s audio1 %d audio2 %d video %d\n",
                callinfo, ip_ver, ip_addr, audio_port, audio_port2,  video_port);
 
     taskinfo = callinfo->taskinfo;
@@ -940,46 +938,6 @@ void rtpstream_playsrtp_ms(rtpstream_callinfo_t* callinfo, rtpstream_actinfo_t* 
     taskinfo->new_file_bytes = cached_files[file_index].bytes;
     taskinfo->new_file_bytes2 = cached_files[file_index2].bytes;
      
-    taskinfo->new_ms_per_packet = actioninfo->ms_per_packet;
-    taskinfo->new_timeticks_per_packet = actioninfo->ticks_per_packet;
-    taskinfo->new_payload_type = actioninfo->payload_type;
-
-    /* set flag that we have a new file to play */
-    taskinfo->flags |= TI_PLAYFILE;
-}
-
-/* code checked */
-void rtpstream_play(rtpstream_callinfo_t* callinfo, rtpstream_actinfo_t* actioninfo)
-{
-    debugprint("rtpstream_play callinfo=%p filename %s loop %d bytes %d payload %d ptime %d tick %d\n", callinfo, actioninfo->filename, actioninfo->loop_count, actioninfo->bytes_per_packet, actioninfo->payload_type, actioninfo->ms_per_packet, actioninfo->ticks_per_packet);
-
-    int           file_index = rtpstream_cache_file(actioninfo->filename);
-    taskentry_t   *taskinfo = callinfo->taskinfo;
-
-    if (file_index < 0) {
-        return; /* cannot find file to play */
-    }
-
-    if (!taskinfo) {
-        return; /* no task data structure */
-    }
-
-    /* make sure we have an open socket from which to play the audio file */
-    taskinfo->audio_rtp_socket = media_socket_audio;
-
-    /* start playback task if not already started */
-    if (!taskinfo->parent_thread) {
-        if (!rtpstream_start_task(callinfo)) {
-            /* error starting playback task */
-            return;
-        }
-    }
-
-    /* save file parameter in taskinfo structure */
-    taskinfo->new_loop_count = actioninfo->loop_count;
-    taskinfo->new_bytes_per_packet = actioninfo->bytes_per_packet;
-    taskinfo->new_file_size = cached_files[file_index].filesize;
-    taskinfo->new_file_bytes = cached_files[file_index].bytes;
     taskinfo->new_ms_per_packet = actioninfo->ms_per_packet;
     taskinfo->new_timeticks_per_packet = actioninfo->ticks_per_packet;
     taskinfo->new_payload_type = actioninfo->payload_type;
