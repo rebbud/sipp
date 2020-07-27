@@ -120,8 +120,8 @@ struct taskentry_t
     pthread_mutex_t      mutex;
 
     /*DUB */
- //   int 		 txindex = -1;
     vector<JLSRTP>      *pVectTxAudio = NULL;
+    int packets_sent=0;
 };
 
 struct rtpstream_callinfo_t

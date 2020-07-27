@@ -97,27 +97,22 @@ unsigned int  global_ssrc_id = 0xCA110000;
 /* code checked */
 static void rtpstream_free_taskinfo(taskentry_t* taskinfo)
 {
+    /* Not closing socket here, as we are using common send socket */ 	
+    taskinfo->audio_rtp_socket = -1;
+    taskinfo->audio_rtp_socket2 = -1;
+    /*
     if (taskinfo) {
-        /* cleanup pthread library structure */
         if (taskinfo->audio_rtp_socket!=-1) {
+          
             close (taskinfo->audio_rtp_socket);
         }
-	/*	
-        if (taskinfo->audio_rtcp_socket!=-1) {
-            close(taskinfo->audio_rtcp_socket);
-        }
-	*/
         if (taskinfo->audio_rtp_socket2!=-1) {
             close(taskinfo->audio_rtp_socket2);
         }
-	/*
-        if (taskinfo->audio_rtcp_socket2!=-1) {
-            close (taskinfo->audio_rtcp_socket2);
-        }
-	*/
         pthread_mutex_destroy(&(taskinfo->mutex));
         free(taskinfo);
     }
+    */	
 }
 
 /* code checked */
@@ -203,7 +198,7 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
                 }
 
                 bool encryption = false;
-                pthread_mutex_lock(&uacAudioMutex); 
+             //   pthread_mutex_lock(&uacAudioMutex); 
                 if(taskinfo->pVectTxAudio != NULL )
                 {
       			 JLSRTP &txUACAudio = taskinfo->pVectTxAudio->at(0);	
@@ -265,7 +260,7 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
                         next_wake = timenow_ms;
                     }
                 }
-                pthread_mutex_unlock(&uacAudioMutex);
+               // pthread_mutex_unlock(&uacAudioMutex);
             }
         } else {
             /* not busy playing back a file -  put possible rtp echo code here. */
@@ -309,7 +304,7 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
 
                 /* now send the actual packet */
                 bool encryption = false;
-                pthread_mutex_lock(&uacAudioMutex); 
+               // pthread_mutex_lock(&uacAudioMutex); 
                 if( taskinfo->pVectTxAudio != NULL )
                 {
       			JLSRTP &txUACAudio = taskinfo->pVectTxAudio->at(1);	
@@ -367,7 +362,7 @@ static unsigned long rtpstream_playrtptask(taskentry_t* taskinfo, unsigned long 
                       //  next_wake = timenow_ms;
                     }
                 }
-		pthread_mutex_unlock(&uacAudioMutex);
+		//pthread_mutex_unlock(&uacAudioMutex);
             }
         } else {
             /* not busy playing back a file -  put possible rtp echo code here. */
