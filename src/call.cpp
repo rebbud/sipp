@@ -293,8 +293,6 @@ void call::get_remote_media_addr(std::string const &msg)
     if (portVect.size() == 2) {
         gai_getsockaddr(&play_args_a.to, host.c_str(), portVect[0].c_str(),
                         AI_NUMERICHOST | AI_NUMERICSERV, family);
-        gai_getsockaddr(&play_args_a.to2, host.c_str(), portVect[1].c_str(),
-                        AI_NUMERICHOST | AI_NUMERICSERV, family);
     }
 
     std::string port = find_in_sdp("m=image ", msg);
@@ -649,7 +647,6 @@ void call::init(scenario * call_scenario, SIPpSocket *socket, struct sockaddr_st
 
 #ifdef PCAPPLAY
     memset(&(play_args_a.to), 0, sizeof(struct sockaddr_storage));
-    memset(&(play_args_a.to2), 0, sizeof(struct sockaddr_storage));
     memset(&(play_args_i.to), 0, sizeof(struct sockaddr_storage));
     memset(&(play_args_v.to), 0, sizeof(struct sockaddr_storage));
     memset(&(play_args_a.from), 0, sizeof(struct sockaddr_storage));
@@ -4670,7 +4667,6 @@ public:
     T get_audio_addr() {
         T sa;
         std::memcpy(&sa, &play_args_a.to, sizeof(T));
-        std::memcpy(&sa, &play_args_a.to2, sizeof(T));
         return sa;
     }
 #endif

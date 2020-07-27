@@ -65,7 +65,6 @@ struct taskentry_t
     volatile int         flags;
     /* DUB ms */
     unsigned long long   ts;
-    unsigned long long   ts2;	
 
     /* rtp stream information */
     unsigned long long   last_timestamp;
@@ -78,7 +77,6 @@ struct taskentry_t
 
     /* current playback information */
     int                  loop_count;
-    int                  loop_count2;
     char                 *file_bytes_start;
     char                 *file_bytes_start2;
     char                 *current_file_bytes;
@@ -121,7 +119,6 @@ struct taskentry_t
 
     /*DUB */
     vector<JLSRTP>      *pVectTxAudio = NULL;
-    int packets_sent=0;
 };
 
 struct rtpstream_callinfo_t
@@ -138,7 +135,6 @@ struct rtpstream_actinfo_t
     char filename[RTPSTREAM_MAX_FILENAMELEN];
     char filename2[RTPSTREAM_MAX_FILENAMELEN];
     int loop_count;
-    int loop_count2;
     int bytes_per_packet;
     int ms_per_packet;
     int ticks_per_packet; /* need rework for 11.025 sample rate */

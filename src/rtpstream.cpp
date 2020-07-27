@@ -133,7 +133,6 @@ static void rtpstream_process_task_flags(taskentry_t* taskinfo)
         taskinfo->timeticks_per_ms = taskinfo->timeticks_per_packet/taskinfo->ms_per_packet;
 
         /* DUB 2nd file */
-        taskinfo->loop_count2 = taskinfo->new_loop_count;
 	taskinfo->file_bytes_start2= taskinfo->new_file_bytes2;
         taskinfo->current_file_bytes2= taskinfo->new_file_bytes2;
         taskinfo->file_num_bytes2= taskinfo->new_file_size2;
@@ -797,7 +796,6 @@ void rtpstream_playsrtp_ms(rtpstream_callinfo_t* callinfo, rtpstream_actinfo_t* 
     int           file_index = rtpstream_cache_file(actioninfo->filename);
     int           file_index2= rtpstream_cache_file (actioninfo->filename2);
     taskentry_t   *taskinfo = callinfo->taskinfo;
-    TRACE_MSG("actioninfo->filename=%s, actioninfo->filename2=%s\n", actioninfo->filename,  actioninfo->filename2 );
  	
     if (file_index < 0) {
         return; /* cannot find file to play */

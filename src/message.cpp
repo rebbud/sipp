@@ -68,7 +68,6 @@ struct KeywordMap SimpleKeywords[] = {
     {"cryptotag1audio", E_Message_CryptoTag1Audio },
     {"cryptotag2audio", E_Message_CryptoTag2Audio },
     {"cryptosuiteaescm128sha1801audio", E_Message_CryptoSuiteAesCm128Sha1801Audio },
- //   {"cryptosuiteaescm128sha1802audio", E_Message_CryptoSuiteAesCm128Sha1802Audio },
     {"cryptosuiteaescm128sha1321audio", E_Message_CryptoSuiteAesCm128Sha1321Audio },
     {"cryptosuiteaescm128sha1322audio", E_Message_CryptoSuiteAesCm128Sha1322Audio },
     {"cryptokeyparams1audio", E_Message_CryptoKeyParams1Audio },

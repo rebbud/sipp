@@ -94,7 +94,6 @@ typedef enum {
     E_Message_CryptoTag1Audio,
     E_Message_CryptoTag2Audio,
     E_Message_CryptoSuiteAesCm128Sha1801Audio,
-   // E_Message_CryptoSuiteAesCm128Sha1802Audio,
     E_Message_CryptoSuiteAesCm128Sha1321Audio,
     E_Message_CryptoSuiteAesCm128Sha1322Audio,
     E_Message_CryptoKeyParams1Audio,

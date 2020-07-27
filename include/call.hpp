@@ -73,8 +73,6 @@ typedef enum
     eNumSessionStates
 } SessionState;
 
-static JLSRTP defaultJLSRTP;
-
 class call : virtual public task, virtual public listener, public virtual socketowner
 {
 public:
