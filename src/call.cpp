@@ -171,10 +171,6 @@ int call::check_audio_ciphersuite_match(SrtpAudioInfoParams &pA)
     return audio_ciphersuite_match;
 }
 
-#define SDP_AUDIOPORT_PREFIX "\nm=audio"
-#define SDP_IMAGEPORT_PREFIX "\nm=image"
-#define SDP_VIDEOPORT_PREFIX "\nm=video"
-
 /* When should this call wake up? */
 unsigned int call::wake()
 {
@@ -294,7 +290,7 @@ void call::get_remote_media_addr(std::string const &msg)
     const int family = media_ip_is_ipv6 ? AF_INET6 : AF_INET;
 
     vector<std::string> portVect = find_audio_line("m=audio ", msg);
-    if (!portVect.size() == 2) {
+    if (portVect.size() == 2) {
         gai_getsockaddr(&play_args_a.to, host.c_str(), portVect[0].c_str(),
                         AI_NUMERICHOST | AI_NUMERICSERV, family);
         gai_getsockaddr(&play_args_a.to2, host.c_str(), portVect[1].c_str(),
@@ -509,7 +505,10 @@ void call::init(scenario * call_scenario, SIPpSocket *socket, struct sockaddr_st
     _sessionStateOld = eNoSession;
     debugBuffer = NULL;
     debugLength = 0;
-
+    txUACAudioVect.resize(2); 
+    rxUACAudioVect.resize(2);
+    txUASAudioVect.resize(2);
+    rxUASAudioVect.resize(2);
     msg_index = 0;
     last_send_index = 0;
     last_send_msg = NULL;
@@ -2191,7 +2190,8 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
             isSrtpCall = true;
             if (sendMode == MODE_CLIENT)
             {
-                TRACE_MSG("call::createSendingMessage():  E_Message_CryptoTag1Audio() - PRIMARY - CLIENT: %d audio_count=%d\n", pA[audio_count].primary_audio_cryptotag,audio_count);
+                TRACE_MSG("call::createSendingMessage():  E_Message_CryptoTag1Audio() - PRIMARY - CLIENT: %d audio_count=%d\n"
+	                  , pA[audio_count].primary_audio_cryptotag,audio_count);
                 txUACAudioVect[audio_count].setCryptoTag(pA[audio_count].primary_audio_cryptotag, PRIMARY_CRYPTO);
             }
             dest += snprintf(dest, left, "%d", pA[audio_count].primary_audio_cryptotag);
@@ -2717,23 +2717,17 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
         SendingMessage::freeMessageComponent(auth_comp);
     }
     #ifdef RTP_STREAM
-    // PASS OUTGOING SRTP PARAMETERS...
     if (srtp_audio_updated && (pA[0].primary_audio_cryptotag != 0))
     {
-        /* To DO ....handle ms here */
-	// Calling it once for both the stream 
         if (sendMode == MODE_CLIENT)
         {
-            //
-            // rxUACAudio SRTP context (b) -- SSRC/IPADDRESS/PORT
-            //
             CryptoContextID rxUACA;
             rxUACA.ssrc = rtpstream_callinfo.taskinfo->ssrc_id;
             rxUACA.address = media_ip;
-            //rxUACA.port = rtpstream_callinfo.local_audioport;
             rxUACA.port = rtpstream_callinfo.audioport;
             TRACE_MSG("call::createSendingMessage():  (b) rxUACAudio SRTP context - ssrc:0x%08x address:%s port:%d\n", rxUACA.ssrc, rxUACA.address.c_str(), rxUACA.port);
             rxUACAudioVect[0].setID(rxUACA);
+            txUACAudioVect[0].setID(rxUACA);
         }
     }
 
@@ -2741,20 +2735,17 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
     {
         if (sendMode == MODE_CLIENT)
         {
-            //
-            // rxUACAudio SRTP context (b) -- SSRC/IPADDRESS/PORT
-            //
             CryptoContextID rxUACA;
             rxUACA.ssrc = rtpstream_callinfo.taskinfo->ssrc_id2;
             rxUACA.address = media_ip;
-            //rxUACA.port = rtpstream_callinfo.local_audioport;
             rxUACA.port = rtpstream_callinfo.audioport2;
             TRACE_MSG("call::createSendingMessage(): Stream2 rxUACAudio SRTP context - ssrc:0x%08x address:%s port:%d\n", rxUACA.ssrc, rxUACA.address.c_str(), rxUACA.port);
             rxUACAudioVect[1].setID(rxUACA);
+            txUACAudioVect[1].setID(rxUACA);
         }
     }
 
-   rtpstream_set_srtp_audio_local(&rtpstream_callinfo, pA);
+    //rtpstream_set_srtp_audio_local(&rtpstream_callinfo, pA);
 
     if (body &&
         !strcmp(get_header_content(msg_buffer, (char*)"Content-Type:"), "application/sdp"))
@@ -2777,7 +2768,7 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
             setSessionState(eCompleted);
         }
     }
-    TRACE_MSG("SIP INVITE=\n%s\n",msg_buffer);
+    TRACE_MSG("\n%s\n",msg_buffer);
     #endif // RTP_STREAM
     return msg_buffer;
 }
@@ -3134,9 +3125,6 @@ void call::process_crypto(vector<SrtpAudioInfoParams> &pA, std::string &host, in
 
 		    if (sendMode == MODE_CLIENT)
 		    {
-			//
-			// txUACAudio SRTP context (a) -- SSRC/IPADDRESS/PORT
-			//
 			CryptoContextID txUACA;
 			txUACA.ssrc = rtpstream_callinfo.taskinfo->ssrc_id;
 			txUACA.address = host;
@@ -3151,9 +3139,6 @@ void call::process_crypto(vector<SrtpAudioInfoParams> &pA, std::string &host, in
 			TRACE_MSG("  (a) txUACAudio SRTP context - ssrc:0x%08x address:%s port:%d\n", txUACA.ssrc, txUACA.address.c_str(), txUACA.port);
 			txUACAudioVect[idx].setID(txUACA);
 
-			//
-			// rxUACAudio SRTP context (b) -- MASTER KEY/SALT PARSE + CRYPTO TAG + CRYPTOSUITE
-			//
 			std::string mks1;
 			mks1 = pA[idx].primary_audio_cryptokeyparams;
 			if (!mks1.empty())
@@ -3181,7 +3166,7 @@ void call::process_crypto(vector<SrtpAudioInfoParams> &pA, std::string &host, in
 		}
 	
      }	
-     rtpstream_set_srtp_audio_remote(&rtpstream_callinfo, pA);
+    // rtpstream_set_srtp_audio_remote(&rtpstream_callinfo, pA);
 
 }
 

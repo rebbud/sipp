@@ -61,6 +61,7 @@ struct taskentry_t
 {
     threaddata_t         *parent_thread;
     unsigned long        nextwake_ms;
+    unsigned long        nextwake_ms2;
     volatile int         flags;
     /* DUB ms */
     unsigned long long   ts;
@@ -112,9 +113,6 @@ struct taskentry_t
     struct sockaddr_storage    remote_audio_rtp_addr;
     struct sockaddr_storage    remote_audio_rtp_addr2;
 
-    struct sockaddr_storage    remote_audio_rtcp_addr;
-    struct sockaddr_storage    remote_audio_rtcp_addr2;
-
     /* we will have a mutex per call. should we consider refactoring to */
     /* share mutexes across calls? makes the per-call code more complex */
 
@@ -122,18 +120,8 @@ struct taskentry_t
     pthread_mutex_t      mutex;
 
     /*DUB */
-    SrtpAudioInfoParams  local_srtp_audio_params;
-    SrtpAudioInfoParams  remote_srtp_audio_params;
-    SrtpVideoInfoParams  local_srtp_video_params;
-    SrtpVideoInfoParams  remote_srtp_video_params;
-
-
-    SrtpAudioInfoParams  local_srtp_audio_params2;
-    SrtpAudioInfoParams  remote_srtp_audio_params2;
-    SrtpVideoInfoParams  local_srtp_video_params2;
-    SrtpVideoInfoParams  remote_srtp_video_params2;
-
-    int 		 txindex = -1;
+ //   int 		 txindex = -1;
+    vector<JLSRTP>      *pVectTxAudio = NULL;
 };
 
 struct rtpstream_callinfo_t
@@ -150,6 +138,7 @@ struct rtpstream_actinfo_t
     char filename[RTPSTREAM_MAX_FILENAMELEN];
     char filename2[RTPSTREAM_MAX_FILENAMELEN];
     int loop_count;
+    int loop_count2;
     int bytes_per_packet;
     int ms_per_packet;
     int ticks_per_packet; /* need rework for 11.025 sample rate */

@@ -138,11 +138,10 @@ public:
     static   int   stepDynamicId;   // step of increment for dynamicId
     static   int   dynamicId;       // a counter for general use, incrementing  by  stepDynamicId starting at startDynamicId  wrapping at maxDynamicId  GLOBALY
     /*DUB ms */
-    vector<JLSRTP> txUACAudioVect={defaultJLSRTP,defaultJLSRTP};
-    vector<JLSRTP> rxUACAudioVect={defaultJLSRTP,defaultJLSRTP};
-    vector<JLSRTP> txUASAudioVect={defaultJLSRTP,defaultJLSRTP};
-    vector<JLSRTP> rxUASAudioVect={defaultJLSRTP,defaultJLSRTP};
-    
+    vector<JLSRTP> txUACAudioVect;
+    vector<JLSRTP> rxUACAudioVect;
+    vector<JLSRTP> txUASAudioVect;
+    vector<JLSRTP> rxUASAudioVect;
     char _pref_audio_cs_out[24];
     char _pref_video_cs_out[24];
     bool isSrtpCall = false;
