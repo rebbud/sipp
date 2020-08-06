@@ -122,7 +122,7 @@ private:
     void init(scenario * call_scenario, SIPpSocket *socket, struct sockaddr_storage *dest, const char * p_id, int userId, bool ipv6, bool isAutomatic, bool isInitCall);
     /* This this call for initialization? */
     bool initCall;
-
+    bool ackSent=false;
     struct sockaddr_storage call_peer;
 
     scenario *call_scenario;
@@ -153,7 +153,6 @@ protected:
     int            msg_index;
     int            zombie;
     char *         realloc_ptr;
-
     /* Last message sent from scenario step (retransmitions do not
      * change this index. Only message sent from the scenario
      * are kept in this index.) */
@@ -197,13 +196,6 @@ protected:
 
 #ifdef RTP_STREAM
     rtpstream_callinfo_t rtpstream_callinfo;
-    /*JLSRTP _txUACAudio;
-    JLSRTP _rxUACAudio;
-    JLSRTP _txUASAudio;
-    JLSRTP _rxUASAudio;
-    char _pref_audio_cs_out[24];
-    char _pref_video_cs_out[24];
-*/
 #endif
 
     /* holds the auth header and if the challenge was 401 or 407 */
@@ -344,6 +336,8 @@ protected:
     int check_video_ciphersuite_match(SrtpVideoInfoParams &pV);
     std::string s_extract_rtp_remote_addr(const char * message, int &ip_ver, int &audio_port, int &video_port);
     int extract_srtp_remote_info(const char * msg, SrtpAudioInfoParams &pA, SrtpVideoInfoParams &pV);
+    void resetSrtpVideoInfoParams(SrtpVideoInfoParams &pV);
+    void resetSrtpAudioInfoParams(SrtpAudioInfoParams &pA);
 #endif
 
     bool lost(int index);
