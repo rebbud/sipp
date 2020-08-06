@@ -499,6 +499,7 @@ void call::init(scenario * call_scenario, SIPpSocket *socket, struct sockaddr_st
 {
     this->call_scenario = call_scenario;
     zombie = false;
+    ackSent = false;
     _sessionStateCurrent = eNoSession;
     _sessionStateOld = eNoSession;
     debugBuffer = NULL;
@@ -2765,7 +2766,11 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
             setSessionState(eCompleted);
         }
     }
-    TRACE_MSG("\n%s\n",msg_buffer);
+    if(!strncmp(msg_buffer,"INVITE",6))
+        TRACE_MSG("\n%s\n",msg_buffer);
+    if(!strncmp(msg_buffer,"ACK",3)){
+	ackSent = true; 	  	
+    }		
     #endif // RTP_STREAM
     return msg_buffer;
 }
@@ -3265,15 +3270,6 @@ bool call::process_incoming(const char* msg, const struct sockaddr_storage* src)
     }
 
 #ifdef RTP_STREAM
-    /* Check if message has a SDP in it; and extract media information. */
-    /*
-    if (!strcmp(get_header_content(msg, "Content-Type:"), "application/sdp") &&
-            hasMedia == 1 && !curmsg->ignoresdp) {
-        const char* ptr = get_header_content(msg, "Content-Length:");
-        if (ptr && atoll(ptr) > 0) {
-            extract_rtp_remote_addr(msg);
-        }
-    }*/
     if (!strcmp(get_header_content(msg, (char*)"Content-Type:"), "application/sdp") && hasMedia == 1) {	      
         int ip_ver = 0;
         int audio_port = 0;
@@ -3283,19 +3279,19 @@ bool call::process_incoming(const char* msg, const struct sockaddr_storage* src)
 
         if (getSessionStateCurrent() == eNoSession)
         {
-            TRACE_MSG("process_incoming()  Switching session state:  eNoSession --> eOfferReceived\n");
+            TRACE_MSG("process_incoming()  Switching session state:  eNoSession --> eOfferReceived cid=%s\n",id);
             setSessionState(eOfferReceived);
         }
         else if (getSessionStateCurrent() == eCompleted)
         {
-            TRACE_MSG("call::process_incoming():  Switching session state:  eCompleted --> eOfferReceived\n");
+            TRACE_MSG("call::process_incoming():  Switching session state:  eCompleted --> eOfferReceived cid=%s\n",id);
             setSessionState(eOfferReceived);
         }
         else if (getSessionStateCurrent() == eOfferSent)
         {
-            TRACE_MSG("call::process_incoming():  Switching session state:  eOfferSent --> eAnswerReceived\n");
+            TRACE_MSG("call::process_incoming():  Switching session state:  eOfferSent --> eAnswerReceived cid=%s \n",id);
             setSessionState(eAnswerReceived);
-            TRACE_MSG("call::process_incoming();  Switching session state:  eAnswerReceived --> eCompleted\n");
+            TRACE_MSG("call::process_incoming();  Switching session state:  eAnswerReceived --> eCompleted cid=%s \n",id);
             setSessionState(eCompleted);
         }
 
@@ -3455,8 +3451,14 @@ bool call::process_incoming(const char* msg, const struct sockaddr_storage* src)
                                 (0 == strncmp (responsecseqmethod, "INVITE", strlen(responsecseqmethod)) ) &&
                                 (call_scenario->messages[search_index+1]->M_type == MSG_TYPE_SEND) &&
                                 (call_scenario->messages[search_index+1]->send_scheme->isAck()) ) {
-                            sendBuffer(createSendingMessage(call_scenario->messages[search_index+1] -> send_scheme, (search_index+1)));
+			    if( ackSent == true ) {
+   			        TRACE_MSG("Got Retransmission of the response (200 OK ) resending previously constructed ACK, cid=%s\n",id);	
+                                sendBuffer(last_send_msg);
+                            } else {		
+                                sendBuffer(createSendingMessage(call_scenario->messages[search_index+1] -> send_scheme, (search_index+1)));
+                            }
                             return true;
+			    
                         }
                     }
                 }
