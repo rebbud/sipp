@@ -778,7 +778,6 @@ void call::init(scenario * call_scenario, SIPpSocket *socket, struct sockaddr_st
 {
     this->call_scenario = call_scenario;
     ackSent=false;
-    lastSentMsg.clear();
     zombie = false;
     _sessionStateCurrent = eNoSession;
     _sessionStateOld = eNoSession;
@@ -3133,7 +3132,7 @@ bool call::process_twinSippCom(char * msg)
     bool            found = false;
     T_ActionResult  actionResult;
 
-    TRACE_MSG("Processing incoming command for call-ID %s:\n%s\n\n", id, msg);
+    callDebug("Processing incoming command for call-ID %s:\n%s\n\n", id, msg);
 
     setRunning();
 
@@ -3843,13 +3842,13 @@ bool call::process_incoming(const char* msg, const struct sockaddr_storage* src)
                              (call_scenario->messages[search_index+1]->send_scheme->isAck()) ) 
 			{
                             if( ackSent == true )
-			    {
-   			       TRACE_MSG("Got Retransmission of the response (200 OK ) resending previously constructed ACK, cid=%s\n",id);	
-                               sendBuffer(last_send_msg);
-			    } else
-			    {		
-                               sendBuffer(createSendingMessage(call_scenario->messages[search_index+1] -> send_scheme, (search_index+1)));
-			    }
+                            {
+   			        TRACE_MSG("Got Retransmission of the response (200 OK ) resending previously constructed ACK, cid=%s\n",id);	
+                                sendBuffer(last_send_msg);
+                            }else
+                            {		
+                                sendBuffer(createSendingMessage(call_scenario->messages[search_index+1] -> send_scheme, (search_index+1)));
+                            }
                             return true;
                         }
                     }
