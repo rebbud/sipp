@@ -3501,7 +3501,7 @@ bool call::process_incoming(const char* msg, const struct sockaddr_storage* src)
         return false;
     }
 
-    if ((transport == T_UDP ) && (retrans_enabled)) {
+    if ((transport == T_UDP) && (retrans_enabled)) {
         /* Detects retransmissions from peer and retransmit the
          * message which was sent just after this one was received */
         cookie = hash(msg);
