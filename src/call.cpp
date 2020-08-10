@@ -3451,14 +3451,14 @@ bool call::process_incoming(const char* msg, const struct sockaddr_storage* src)
                                 (0 == strncmp (responsecseqmethod, "INVITE", strlen(responsecseqmethod)) ) &&
                                 (call_scenario->messages[search_index+1]->M_type == MSG_TYPE_SEND) &&
                                 (call_scenario->messages[search_index+1]->send_scheme->isAck()) ) {
-			    if( ackSent == true ) {
-   			        TRACE_MSG("Got Retransmission of the response (200 OK ) resending previously constructed ACK, cid=%s\n",id);	
-                                sendBuffer(last_send_msg);
-                            } else {		
-                                sendBuffer(createSendingMessage(call_scenario->messages[search_index+1] -> send_scheme, (search_index+1)));
-                            }
-                            return true;
-			    
+
+			        if( ackSent == true ) {
+   			            TRACE_MSG("Got Retransmission of the response (200 OK ) resending previously constructed ACK, cid=%s\n",id);	
+                                    sendBuffer(last_send_msg);
+                                } else {		
+                                  sendBuffer(createSendingMessage(call_scenario->messages[search_index+1] -> send_scheme, (search_index+1)));
+                                }
+                                return true;
                         }
                     }
                 }
