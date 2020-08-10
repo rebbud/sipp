@@ -124,7 +124,7 @@ private:
     void init(scenario * call_scenario, SIPpSocket *socket, struct sockaddr_storage *dest, const char * p_id, int userId, bool ipv6, bool isAutomatic, bool isInitCall);
     /* This this call for initialization? */
     bool initCall;
-
+    bool ackSent=false;
     struct sockaddr_storage call_peer;
 
     scenario *call_scenario;
@@ -151,6 +151,7 @@ protected:
     int            msg_index;
     int            zombie;
     char *         realloc_ptr;
+    
 
     /* Last message sent from scenario step (retransmitions do not
      * change this index. Only message sent from the scenario
