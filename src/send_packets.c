@@ -130,8 +130,15 @@ void free_pcaps(pcap_pkts *pkts)
         free(it->data);
     }
 
+    for (it = pkts->pkts2; it != pkts->max2; ++it) {
+        free(it->data);
+    }
+
     free(pkts->pkts);
     free(pkts->file);
+
+    free(pkts->pkts2);
+    free(pkts->file2);
     free(pkts);
 }
 
