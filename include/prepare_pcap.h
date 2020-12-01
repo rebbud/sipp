@@ -63,6 +63,13 @@ typedef struct {
     u_long max_length;
     pcap_pkt *max;
     pcap_pkt *pkts;
+
+    /*! DUB - 2nd pcap */
+    char *file2;
+    u_int16_t base2;
+    u_long max_length2;
+    pcap_pkt *max2;
+    pcap_pkt *pkts2;
 } pcap_pkts;
 
 #ifdef __cplusplus
@@ -71,6 +78,7 @@ extern "C" {
     int check(u_int16_t *, int);
     u_int16_t checksum_carry(int);
     int prepare_pkts(char *, pcap_pkts *);
+    int prepare_pkts2(char *, pcap_pkts *);
 #ifdef __cplusplus
 }
 #endif

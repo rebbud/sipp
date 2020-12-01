@@ -313,8 +313,137 @@ int prepare_pkts(char *file, pcap_pkts *pkts)
     pkts->max = pkts->pkts + n_pkts;
     pkts->max_length = max_length;
     pkts->base = base;
+    WARNING("In pcap %s, npkts %d\nmax pkt length %ld\nbase port %d\n", file, n_pkts, max_length, base);
     fprintf(stderr, "In pcap %s, npkts %d\nmax pkt length %ld\nbase port %d\n", file, n_pkts, max_length, base);
     pcap_close(pcap);
 
     return 0;
 }
+
+/* prepare a pcap file
+ */
+int prepare_pkts2(char *file, pcap_pkts *pkts)
+{
+    pcap_t* pcap2;
+#ifdef HAVE_PCAP_NEXT_EX
+    struct pcap_pkthdr* pkthdr = NULL;
+#else
+    struct pcap_pkthdr pkthdr_storage;
+    struct pcap_pkthdr* pkthdr = &pkthdr_storage;
+#endif
+    const uint8_t* pktdata = NULL;
+    int n_pkts = 0;
+    uint64_t max_length = 0;
+    size_t ether_type_offset = 0;
+    uint16_t base = 0xffff;
+    uint64_t pktlen;
+    pcap_pkt* pkt_index;
+    ether_type_hdr* ethhdr;
+
+    struct iphdr* iphdr;
+    ipv6_hdr* ip6hdr;
+    struct udphdr* udphdr;
+
+    pkts->pkts2 = NULL;
+
+    pcap2 = pcap_open_offline(file, errbuf);
+    if (!pcap2)
+        ERROR_NO("Can't open PCAP2 file '%s'", file);
+#ifdef HAVE_PCAP_NEXT_EX
+    while (pcap_next_ex(pcap2, &pkthdr, &pktdata) == 1) {
+#else
+    while ((pktdata = pcap_next(pcap2, pkthdr)) != NULL) {
+#endif
+        if (pkthdr->len != pkthdr->caplen) {
+            ERROR("You got truncated packets. Please create a new dump with -s0");
+        }
+
+        /* Determine offset from packet to ether type only once. */
+        if (!ether_type_offset) {
+            int datalink = pcap_datalink(pcap2);
+            ether_type_offset = get_ethertype_offset(datalink, pktdata);
+        }
+
+        ethhdr = (ether_type_hdr *)(pktdata + ether_type_offset);
+        if (ntohs(ethhdr->ether_type) != 0x0800 /* IPv4 */
+                && ntohs(ethhdr->ether_type) != 0x86dd) { /* IPv6 */
+            fprintf(stderr, "Ignoring non IP{4,6} packet, got ether_type %hu!\n",
+                    ntohs(ethhdr->ether_type));
+            continue;
+        }
+        iphdr = (struct iphdr*)((char*)ethhdr + sizeof(*ethhdr));
+        if (iphdr && iphdr->version == 6) {
+            /* ipv6 */
+            pktlen = (uint64_t)pkthdr->len - sizeof(*ethhdr) - sizeof(*ip6hdr);
+            ip6hdr = (ipv6_hdr*)(void*)iphdr;
+            if (ip6hdr->nxt_header != IPPROTO_UDP) {
+                fprintf(stderr, "prepare_pcap.c: Ignoring non UDP packet!\n");
+                continue;
+            }
+            udphdr = (struct udphdr*)((char*)ip6hdr + sizeof(*ip6hdr));
+        } else {
+            /* ipv4 */
+            if (iphdr->protocol != IPPROTO_UDP) {
+                fprintf(stderr, "prepare_pcap.c: Ignoring non UDP packet!\n");
+                continue;
+            }
+#if defined(__DARWIN) || defined(__CYGWIN) || defined(__FreeBSD__)
+            udphdr = (struct udphdr*)((char*)iphdr + (iphdr->ihl << 2) + 4);
+            pktlen = (uint64_t)(ntohs(udphdr->uh_ulen));
+#elif defined ( __HPUX)
+            udphdr = (struct udphdr*)((char*)iphdr + (iphdr->ihl << 2));
+            pktlen = (uint64_t) pkthdr->len - sizeof(*ethhdr) - sizeof(*iphdr);
+#else
+            udphdr = (struct udphdr*)((char*)iphdr + (iphdr->ihl << 2));
+            pktlen = (uint64_t)(ntohs(udphdr->len));
+#endif
+        }
+        if (pktlen > PCAP_MAXPACKET) {
+            ERROR("Packet size is too big! Recompile with bigger PCAP_MAXPACKET in prepare_pcap.h");
+        }
+        pkts->pkts2 = (pcap_pkt *)realloc(pkts->pkts2, sizeof(*(pkts->pkts2)) * (n_pkts + 1));
+        if (!pkts->pkts2)
+            ERROR("Can't re-allocate memory for pcap pkt");
+        pkt_index = pkts->pkts2 + n_pkts;
+        pkt_index->pktlen = pktlen;
+        pkt_index->ts = pkthdr->ts;
+        pkt_index->data = (unsigned char *) malloc(pktlen);
+        if (!pkt_index->data)
+            ERROR("Can't allocate memory for pcap pkt data");
+        memcpy(pkt_index->data, udphdr, pktlen);
+
+#if defined(__HPUX) || defined(__DARWIN) || (defined __CYGWIN) || defined(__FreeBSD__)
+        udphdr->uh_sum = 0 ;
+#else
+        udphdr->check = 0;
+#endif
+
+        /* compute a partial udp checksum */
+        /* not including port that will be changed */
+        /* when sending RTP */
+#if defined(__HPUX) || defined(__DARWIN) || (defined __CYGWIN) || defined(__FreeBSD__)
+        pkt_index->partial_check = check((uint16_t*)&udphdr->uh_ulen, pktlen - 4) + ntohs(IPPROTO_UDP + pktlen);
+#else
+        pkt_index->partial_check = check((uint16_t*)&udphdr->len, pktlen - 4) + ntohs(IPPROTO_UDP + pktlen);
+#endif
+        if (max_length < pktlen)
+            max_length = pktlen;
+#if defined(__HPUX) || defined(__DARWIN) || (defined __CYGWIN) || defined(__FreeBSD__)
+        if (base > ntohs(udphdr->uh_dport))
+            base = ntohs(udphdr->uh_dport);
+#else
+        if (base > ntohs(udphdr->dest))
+            base = ntohs(udphdr->dest);
+#endif
+        n_pkts++;
+    }
+    pkts->max2 = pkts->pkts2 + n_pkts;
+    pkts->max_length2 = max_length;
+    pkts->base2 = base;
+    WARNING("In pcap %s, npkts %d\nmax pkt length %ld\nbase port %d\n", file, n_pkts, max_length, base);
+    fprintf(stderr, "In pcap %s, npkts %d\nmax pkt length %ld\nbase port %d\n", file, n_pkts, max_length, base);
+    pcap_close(pcap2);
+
+    return 0;
+}
+

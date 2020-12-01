@@ -111,10 +111,12 @@ inline void float2timer (float time, struct timeval *tvp);
 typedef struct {
     /* pointer to a RTP pkts container */
     pcap_pkts *pcap;
+    pcap_pkts *pcap2;
     /* Used in send_packets thread */
     struct sockaddr_storage to;
-    struct sockaddr_storage from;
     struct sockaddr_storage to2;
+    struct sockaddr_storage from;
+    struct sockaddr_storage from2;
 } play_args_t;
 
 #ifdef __cplusplus
@@ -124,6 +126,7 @@ extern "C"
     int parse_play_args(const char*, pcap_pkts*);
     void free_pcaps(pcap_pkts *pkts);
     int send_packets(play_args_t*);
+    int send_packets2(play_args_t*);
 #ifdef __cplusplus
 }
 #endif

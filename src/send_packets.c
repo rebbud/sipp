@@ -57,6 +57,7 @@
 extern char* scenario_path;
 extern volatile unsigned long rtp_pckts_pcap;
 extern volatile unsigned long rtp_bytes_pcap;
+
 extern bool media_ip_is_ipv6;
 
 inline void
@@ -113,6 +114,12 @@ int parse_play_args(const char* filename, pcap_pkts* pkts)
 {
     pkts->file = find_file(filename);
     prepare_pkts(pkts->file, pkts);
+
+    /*! DUB -2nd pcap file */
+    char filename2[512]="\0";
+    snprintf(filename2, sizeof(filename2), "%s2", filename);
+    pkts->file2 = find_file(filename2);
+    prepare_pkts2(pkts->file2, pkts);
     return 1;
 }
 
@@ -150,20 +157,25 @@ void send_packets_cleanup(void *arg)
 
 int send_packets (play_args_t * play_args)
 {
-    int ret, sock, port_diff;
+    int ret, sock, port_diff, port_diff2;
     pcap_pkt *pkt_index, *pkt_max;
-    uint16_t *from_port, *to_port;
+    pcap_pkt *pkt_index2, *pkt_max2;
+    uint16_t *from_port, *to_port, *to_port2;
     struct timeval didsleep = { 0, 0 };
     struct timeval start = { 0, 0 };
     struct timeval last = { 0, 0 };
+    struct timeval last2 = { 0, 0 };
     pcap_pkts *pkts = play_args->pcap;
     /* to and from are pointers in case play_args (call sticky) gets modified! */
     struct sockaddr_storage *to = &(play_args->to);
+    struct sockaddr_storage *to2 = &(play_args->to2);
     struct sockaddr_storage *from = &(play_args->from);
     struct udphdr *udp;
+    struct udphdr *udp2;
     struct sockaddr_in6 to6, from6;
     char buffer[PCAP_MAXPACKET];
-    int temp_sum;
+    char buffer2[PCAP_MAXPACKET];
+    int temp_sum, temp_sum2;
     int len;
 
 #ifndef MSG_DONTWAIT
@@ -183,28 +195,30 @@ int send_packets (play_args_t * play_args)
         from_port = &(((struct sockaddr_in *)(void *) from )->sin_port);
         len = sizeof(struct sockaddr_in);
         to_port = &(((struct sockaddr_in *)(void *) to )->sin_port);
+        to_port2 = &(((struct sockaddr_in *)(void *) to2 )->sin_port);
         if (sock < 0) {
             ERROR("Can't create raw IPv4 socket (need to run as root?): %s", strerror(errno));
             return ret;
         }
     }
 
-
     if ((ret = bind(sock, (struct sockaddr *)(void *)from, len))) {
         ERROR("Can't bind media raw socket");
         return ret;
     }
-// AQUI (no llega aqui)
-WARNING(":: send_packets (play_args_t * play_args)");
+
 #ifndef MSG_DONTWAIT
     fd_flags = fcntl(sock, F_GETFL , NULL);
     fd_flags |= O_NONBLOCK;
     fcntl(sock, F_SETFL , fd_flags);
 #endif
     udp = (struct udphdr *)buffer;
+    udp2 = (struct udphdr *)buffer2;
 
     pkt_index = pkts->pkts;
+    pkt_index2 = pkts->pkts2;
     pkt_max = pkts->max;
+    pkt_max2 = pkts->max2;
 
     if (media_ip_is_ipv6) {
         memset(&to6, 0, sizeof(to6));
@@ -215,15 +229,14 @@ WARNING(":: send_packets (play_args_t * play_args)");
         memcpy(&(from6.sin6_addr.s6_addr), &(((struct sockaddr_in6 *)(void *) from)->sin6_addr.s6_addr), sizeof(from6.sin6_addr.s6_addr));
     }
 
-
     /* Ensure the sender socket is closed when the thread exits - this
      * allows the thread to be cancelled cleanly.
      */
     pthread_cleanup_push(send_packets_cleanup, ((void *) &sock));
 
-
-    while (pkt_index < pkt_max) {
+    while ((pkt_index < pkt_max) && (pkt_index2 < pkt_max2) ){
         memcpy(udp, pkt_index->data, pkt_index->pktlen);
+        memcpy(udp2, pkt_index2->data, pkt_index2->pktlen);
 #if defined(__HPUX) || defined(__DARWIN) || (defined __CYGWIN) || defined(__FreeBSD__)
         port_diff = ntohs(udp->uh_dport) - pkts->base;
         /* modify UDP ports */
@@ -250,9 +263,15 @@ WARNING(":: send_packets (play_args_t * play_args)");
 #endif
 #else
         port_diff = ntohs(udp->dest) - pkts->base;
+        port_diff2 = ntohs(udp2->dest) - pkts->base2;
         /* modify UDP ports */
         udp->source = htons(port_diff + ntohs(*from_port));
+        udp2->source = htons(port_diff2 + ntohs(*from_port));
         udp->dest = htons(port_diff + ntohs(*to_port));
+        udp2->dest = htons(port_diff2 + ntohs(*to_port2));
+
+	WARNING("Audio1 :: from_port :: %d :: to_port :: %d\n", ntohs(*from_port), ntohs(*to_port));
+	WARNING("Audio2 :: from_port :: %d :: to_port :: %d\n", ntohs(*from_port), ntohs(*to_port2));
 
         if (!media_ip_is_ipv6) {
             temp_sum = checksum_carry(
@@ -260,6 +279,11 @@ WARNING(":: send_packets (play_args_t * play_args)");
                     check((u_int16_t *) &(((struct sockaddr_in *)(void *) from)->sin_addr.s_addr), 4) +
                     check((u_int16_t *) &(((struct sockaddr_in *)(void *) to)->sin_addr.s_addr), 4) +
                     check((u_int16_t *) &udp->source, 4));
+            temp_sum2 = checksum_carry(
+                    pkt_index2->partial_check +
+                    check((u_int16_t *) &(((struct sockaddr_in *)(void *) from)->sin_addr.s_addr), 4) +
+                    check((u_int16_t *) &(((struct sockaddr_in *)(void *) to2)->sin_addr.s_addr), 4) +
+                    check((u_int16_t *) &udp2->source, 4));
         } else {
             temp_sum = checksum_carry(
                     pkt_index->partial_check +
@@ -268,14 +292,16 @@ WARNING(":: send_packets (play_args_t * play_args)");
                     check((u_int16_t *) &udp->source, 4));
         }
         udp->check = temp_sum;
+        udp2->check = temp_sum2;
 #endif
 
-        do_sleep ((struct timeval *) &pkt_index->ts, &last, &didsleep,
-                  &start);
+        do_sleep ((struct timeval *) &pkt_index->ts, &last, &didsleep, &start);
 #ifdef MSG_DONTWAIT
         if (!media_ip_is_ipv6) {
             ret = sendto(sock, buffer, pkt_index->pktlen, MSG_DONTWAIT,
                          (struct sockaddr *)(void *) to, sizeof(struct sockaddr_in));
+            ret = sendto(sock, buffer2, pkt_index2->pktlen, MSG_DONTWAIT,
+                         (struct sockaddr *)(void *) to2, sizeof(struct sockaddr_in));
         } else {
             ret = sendto(sock, buffer, pkt_index->pktlen, MSG_DONTWAIT,
                          (struct sockaddr *)(void *) &to6, sizeof(struct sockaddr_in6));
@@ -284,6 +310,8 @@ WARNING(":: send_packets (play_args_t * play_args)");
         if (!media_ip_is_ipv6) {
             ret = sendto(sock, buffer, pkt_index->pktlen, 0,
                          (struct sockaddr *)(void *) to, sizeof(struct sockaddr_in));
+            ret = sendto(sock, buffer2, pkt_index2->pktlen, 0,
+                         (struct sockaddr *)(void *) to2, sizeof(struct sockaddr_in));
         } else {
             ret = sendto(sock, buffer, pkt_index->pktlen, 0,
                          (struct sockaddr *)(void *) &to6, sizeof(struct sockaddr_in6));
@@ -298,7 +326,9 @@ WARNING(":: send_packets (play_args_t * play_args)");
         rtp_pckts_pcap++;
         rtp_bytes_pcap += pkt_index->pktlen - sizeof(*udp);
         memcpy (&last, &(pkt_index->ts), sizeof (struct timeval));
+        memcpy (&last2, &(pkt_index2->ts), sizeof (struct timeval));
         pkt_index++;
+        pkt_index2++;
     }
 
     /* Closing the socket is handled by pthread_cleanup_push()/pthread_cleanup_pop() */

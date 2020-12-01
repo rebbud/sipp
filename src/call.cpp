@@ -237,22 +237,23 @@ uint16_t get_remote_port_media(const char *msg, enum media_ptn pattype)
         return 0;
     }
     begin = strstr(my_msg, pattern);
+
     if (!begin) {
         free(my_msg);
         /* m=audio not found */
         return 0;
     }
+
     if (pattype == PAT_AUDIO2) {
        // Finding the 2nd occurrence
        begin = strstr(begin+1,pattern);
-       }
+    }
+
     if (!begin) {
         free(my_msg);
         /* m=audio not found */
         return 0;
     }
-
-
 
     begin += strlen(pattern);
     end = find_sdp_eol(begin);
@@ -266,6 +267,7 @@ uint16_t get_remote_port_media(const char *msg, enum media_ptn pattype)
     strncpy(number, begin, sizeof(number) - 1);
     number[sizeof(number) - 1] = '\0';
     free(my_msg);
+
     return atoi(number);
 }
 
@@ -274,7 +276,7 @@ uint16_t get_remote_port_media(const char *msg, enum media_ptn pattype)
  */
 void call::get_remote_media_addr(char *msg)
 {
-    uint16_t audio_port,audio_port2, image_port, video_port;
+    uint16_t audio_port, audio_port2, image_port, video_port;
     if (media_ip_is_ipv6) {
         struct in6_addr ip_media;
         if (get_remote_ipv6_media(msg, &ip_media)) {
@@ -323,7 +325,7 @@ void call::get_remote_media_addr(char *msg)
             audio_port = get_remote_port_media(msg, PAT_AUDIO);
             audio_port2 = get_remote_port_media(msg, PAT_AUDIO2);
             if (audio_port) {
-                LOG_MSG("AQUI: call::get_remote_media_addr(), we found a remote audio port: %d\n", audio_port);
+                WARNING("PARSE SDP in 200OK  trying get_remote_port_media(msg, PAT_AUDIO) | audio_port:: %d\n", audio_port);
                 /* We have audio in the SDP: set the to_audio addr */
                 (_RCAST(struct sockaddr_in *, &(play_args_a.to)))->sin_family = AF_INET;
 
@@ -331,7 +333,7 @@ void call::get_remote_media_addr(char *msg)
                 (_RCAST(struct sockaddr_in *, &(play_args_a.to)))->sin_addr.s_addr = ip_media;
 
                // Looking for the 2nd m=audio
-                       //WARNING(" >> trying get_remote_port_media(msg, PAT_AUDIO2) | audio_port:'%d'",audio_port);
+               WARNING("PARSE SDP in 200OK trying get_remote_port_media(msg, PAT_AUDIO2) | audio_port:: %d",audio_port2);
                if (audio_port2) {
                        LOG_MSG("AQUI: call::get_remote_media_addr(), we found remote 2nd audio port: %d\n", audio_port2);
                        (_RCAST(struct sockaddr_in *, &(play_args_a.to2)))->sin_family = AF_INET;
@@ -710,6 +712,7 @@ void call::init(scenario * call_scenario, struct sipp_socket *socket, struct soc
     memset(&(play_args_i.to), 0, sizeof(struct sockaddr_storage));
     memset(&(play_args_v.to), 0, sizeof(struct sockaddr_storage));
     memset(&(play_args_a.from), 0, sizeof(struct sockaddr_storage));
+    memset(&(play_args_a.from2), 0, sizeof(struct sockaddr_storage));
     memset(&(play_args_i.from), 0, sizeof(struct sockaddr_storage));
     memset(&(play_args_v.from), 0, sizeof(struct sockaddr_storage));
     hasMediaInformation = 0;
@@ -2221,8 +2224,10 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
         case E_Message_Media_Port:
         case E_Message_Auto_Media_Port: {
             int port = media_port + comp->offset;
+            int port2 = port + comp->offset;
             if (comp->type == E_Message_Auto_Media_Port) {
                 port = media_port + (4 * (number - 1)) % 10000 + comp->offset;
+                port2 = port + (4 * (number - 1)) % 10000 + comp->offset;
             }
 #ifdef PCAPPLAY
             char *begin = dest;
@@ -2238,7 +2243,7 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
             play_args_t *play_args = NULL;
             if (strstr(begin, "audio")) {
                 play_args = &play_args_a;
-		LOG_MSG("AQUI: call::createSendingMessage() : play_args = &play_args_a. port=%d\n",port);
+		LOG_MSG("AQUI: call::createSendingMessage() : play_args = &play_args_a. port=%d\n", port);
             } else if (strstr(begin, "image")) {
                 play_args = &play_args_i;
             } else if (strstr(begin, "video")) {
@@ -2250,6 +2255,7 @@ char* call::createSendingMessage(SendingMessage *src, int P_index, char *msg_buf
                 (_RCAST(struct sockaddr_in6 *, &(play_args->from)))->sin6_port = htons(port);
             } else {
                 (_RCAST(struct sockaddr_in *, &(play_args->from)))->sin_port = htons(port);
+                (_RCAST(struct sockaddr_in *, &(play_args->from2)))->sin_port = htons(port2);
             }
 #endif
             dest += sprintf(dest, "%u", port);
@@ -3957,7 +3963,11 @@ call::T_ActionResult call::executeAction(char * msg, message *curmsg)
                 ERROR("Can't find pcap data to play");
             }
 
-            play_args->pcap = currentAction->getPcapPkts();
+            play_args->pcap   = currentAction->getPcapPkts();
+	    //pcap_pkts *lpcap  = currentAction->getPcapPkts();
+
+            //play_args->pcap2   = lpcap->pkts2->pcap;
+
             /* port number is set in [auto_]media_port interpolation */
             if (media_ip_is_ipv6) {
                 struct sockaddr_in6 *from = (struct sockaddr_in6 *)(void *) &(play_args->from);
@@ -3971,7 +3981,7 @@ call::T_ActionResult call::executeAction(char * msg, message *curmsg)
             /* Create a thread to send RTP or UDPTL packets */
             pthread_attr_t attr;
 
-WARNING("=== Create a thread to send RTP or UDPTL packets: pthread_attr_init(&attr)");
+            WARNING("=== Create a thread to send RTP or UDPTL packets: pthread_attr_init(&attr)");
             pthread_attr_init(&attr);
 #ifndef PTHREAD_STACK_MIN
 #define PTHREAD_STACK_MIN  16384
@@ -3983,8 +3993,8 @@ WARNING("=== Create a thread to send RTP or UDPTL packets: pthread_attr_init(&at
                 pthread_join(media_thread, NULL);
                 media_thread = 0;
             }
-            int ret = pthread_create(&media_thread, &attr, send_wrapper,
-                                     (void *) play_args);
+            int ret = pthread_create(&media_thread, &attr, send_wrapper, (void *) play_args);
+
             if(ret)
                 ERROR("Can't create thread to send RTP packets");
             pthread_attr_destroy(&attr);
