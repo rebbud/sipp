@@ -167,6 +167,7 @@ private:
 #ifdef PCAPPLAY
     int hasMediaInformation;
     pthread_t media_thread;
+    pthread_t media_thread2;
     play_args_t play_args_a;
     play_args_t play_args_i;
     play_args_t play_args_v;
